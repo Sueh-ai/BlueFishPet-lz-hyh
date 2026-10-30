@@ -14,15 +14,12 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
           
-      - name: Setup Gradle
-        uses: gradle/gradle-build-action@v3
+      - name: Give execution permission
+        run: chmod +x gradlew
         
       - name: Build debug APK
-        run: gradle assembleDebug
-        env:
-          ANDROID_HOME: /usr/local/lib/android/sdk
-          ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
-          
+        run: ./gradlew assembleDebug || gradle assembleDebug
+        
       - uses: actions/upload-artifact@v4
         with:
           name: app-debug
