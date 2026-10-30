@@ -113,25 +113,31 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         private var jumpY = 0f
         private var shakeUntil = 0L
         private var spinUntil = 0L
-
-        private val rand = Random(SystemClock.uptimeMillis())
-
-        init {
-            bodyPaint.color = Color.rgb(60, 160, 255)
-            bubblePaint.color = Color.argb(220, 255, 255, 255)
-            postDelayed(idleRunnable, 8000L)
+private val rand = Random(SystemClock.uptimeMillis())
+private val idleRunnable = object : Runnable {
+    override fun run() {
+        if (SystemClock.uptimeMillis() > bubbleUntil && !dragging) {
+            showBubble(FishDialogue.pick(FishDialogue.idle))
         }
+        postDelayed(this, 15000L)
+    }
+}
 
-        override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
-            super.onSizeChanged(w, h, oldw, oldh)
-            if (cx == 400f && cy == 800f) {
-                cx = w / 2f
-                cy = h / 2f
-                cruiseTargetX = cx
-                cruiseTargetY = cy
-            }
-        }
+init {
+    bodyPaint.color = Color.rgb(60, 160, 255)
+    bubblePaint.color = Color.argb(220, 255, 255, 255)
+    postDelayed(idleRunnable, 8000L)
+}
 
+override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
+    super.onSizeChanged(w, h, oldw, oldh)
+    if (cx == 400f && cy == 800f) {
+        cx = w / 2f
+        cy = h / 2f
+        cruiseTargetX = cx
+        cruiseTargetY = cy
+    }
+}
         override fun onDraw(canvas: Canvas) {
             super.onDraw(canvas)
             val now = SystemClock.uptimeMillis()
@@ -408,15 +414,6 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
                 .setPositiveButton("确定") { _, _ -> showBubble("以后我就叫${et.text}啦") }
                 .setNegativeButton("取消", null)
                 .show()
-        }
-
-        private val idleRunnable = object : Runnable {
-            override fun run() {
-                if (SystemClock.uptimeMillis() > bubbleUntil && !dragging) {
-                    showBubble(FishDialogue.pick(FishDialogue.idle))
-                }
-                postDelayed(this, 15000L)
-            }
         }
     }
 }
