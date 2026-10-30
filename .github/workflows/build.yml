@@ -14,7 +14,7 @@ jobs:
           java-version: '17'
       - uses: android-actions/setup-android@v3
       - name: Build debug APK
-        run: chmod +x gradlew 2>/dev/null; ./gradlew assembleDebug || gradle assembleDebug
+        run: gradle assembleDebug
       - uses: actions/upload-artifact@v4
         with:
           name: app-debug
