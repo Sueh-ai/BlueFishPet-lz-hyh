@@ -1,4 +1,4 @@
-package com.example.bluefish // ⚠️ 必须和你的包名一模一样
+package com.example.bluefish //
 
 import android.app.Service
 import android.content.Intent
