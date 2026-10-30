@@ -23,7 +23,7 @@ jobs:
           echo "sdk.dir=/usr/local/lib/android/sdk" > local.properties
           
       - name: Build APK
-        run: gradle wrapper --gradle-version 8.2 && gradle assembleDebug --stacktrace
+        run: gradle wrapper --gradle-version 8.2 && ./gradlew assembleDebug
         
       - name: Upload APK
         uses: actions/upload-artifact@v4
