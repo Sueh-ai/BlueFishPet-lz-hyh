@@ -109,18 +109,23 @@ class FloatingFishService : Service(), SensorEventListener {
         floatingView.addView(maidFish)
 
         tvDialogue = TextView(this).apply {
-            val bubbleBg = GradientDrawable().apply {
-                setColor(Color.parseColor("#E6192124"))
-                cornerRadius = 30f
-                setStroke(2, Color.parseColor("#3A3A3A"))
-            }
-            background = bubbleBg
-            setTextColor(Color.WHITE)
-            textSize = 14f
-            setPadding(30, 20, 30, 20)
-            visibility = View.INVISIBLE
-            alpha = 0f 
-            gravity = Gravity.CENTER
+    val bubbleBg = GradientDrawable().apply {
+        setColor(Color.parseColor("#E6192124"))
+        cornerRadius = 30f
+        setStroke(2, Color.parseColor("#3A3A3A"))
+    }
+    background = bubbleBg
+    setTextColor(Color.WHITE)
+    textSize = 14f
+    setPadding(30, 20, 30, 20)
+    visibility = View.INVISIBLE
+    alpha = 0f 
+    gravity = Gravity.CENTER
+    
+    // 🌟 核心修复：限制最大宽度，并允许文字换行
+    // 使用 resources.displayMetrics 提前获取屏幕宽度，不依赖外面的变量
+    maxWidth = (resources.displayMetrics.widthPixels * 0.75).toInt()
+    isSingleLine = false
         }
         val tvLp = FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.WRAP_CONTENT,
