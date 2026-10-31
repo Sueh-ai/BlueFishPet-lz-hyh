@@ -18,6 +18,7 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import com.bumptech.glide.Glide
+import kotlin.math.abs
 import kotlin.random.Random
 
 class FloatingFishService : Service() {
@@ -32,8 +33,8 @@ class FloatingFishService : Service() {
     private var velocityY = 0f
     private var isDragging = false
     private var gravity = 20f
-    private var bounceFactor = -0.8f // 🌟 增强了反弹力度
-    private var friction = 0.95f
+    private var bounceFactor = -0.8f // 弹力
+    private var friction = 0.96f // 摩擦
     private var screenWidth = 0
     private var screenHeight = 0
 
@@ -43,7 +44,6 @@ class FloatingFishService : Service() {
     private val playList = mutableListOf<String>()
     private val clickList = mutableListOf<String>()
 
-    // 🌟 台词库
     private val clickLines = listOf(
         "我亲爱的黎子少爷", "今天还爱我", "我好想你", 
         "少爷，你终于来看我啦！", "一直盯着你看，都不好意思了...", "最喜欢少爷摸我头了~",
@@ -53,14 +53,7 @@ class FloatingFishService : Service() {
         "哎呀！你弄乱我的头发了！", "少爷，你点得我头好晕呀...", "再戳我，大肥鱼可要生气了哦！",
         "笨蛋少爷，我才没有想你！", "走开走开，我要睡觉啦。", "少爷，你是不是又忘记喂我了？",
         "不理你了，除非你拿小鱼干来哄我！", "大肥鱼也是有脾气的！", "我是大肥鱼，会吐泡泡的那种哦！",
-        "今天的网速好像有点慢呢。", "少爷，今天中午吃什么呀？", "救命，我卡在屏幕边缘了！",
-        "如果少爷每天都能陪我玩就好了。", "我是不是全宇宙最可爱的女仆？", "黎子少爷，工作辛苦啦，休息一下吧。",
-        "滴——电量不足，需要少爷的亲亲充电。", "我要在屏幕上跑圈圈啦！", "今天也是努力学习做女仆的一天！",
-        "少爷，你看我新学的舞步好看吗？", "盯——(●'◡'●)", "不知道少爷的脑袋里在想什么呢？",
-        "如果我不听话，少爷会赶我走吗？", "虽然我胖胖的，但是我跑得快呀！", "少爷，别熬夜啦，快去睡觉！",
-        "我最大的梦想，就是一直陪在少爷身边。", "今天也是被黎子少爷迷倒的一天。", "偷偷告诉你，其实我是一条美人鱼~",
-        "少爷少爷，快看！那里有只小猫！", "我刚刚是不是很没形象地摔倒了？", "少爷，你要是再不理我，我就哭给你看！",
-        "大肥鱼想睡觉了，要抱抱才肯睡...", "其实我有点怕黑，少爷别关灯。", "少爷，我今天表现得好不好呀？"
+        "今天的网速好像有点慢呢。", "少爷，今天中午吃什么呀？", "救命，我卡在屏幕边缘了！"
     )
     private val idleLines = listOf("好无聊呀...", "今天天气真好。")
     private val sleepLines = listOf("呼...呼...", "Zzz...")
@@ -73,18 +66,20 @@ class FloatingFishService : Service() {
         super.onCreate()
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
         
-        // 纯代码构建 UI
+        // 读取你在 MainActivity 里设置的大小
+        val prefs = getSharedPreferences("fish_prefs", MODE_PRIVATE)
+        val fishSize = prefs.getInt("fish_size", 600)
+
         floatingView = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
-            clipChildren = false // 防止气泡被裁剪
+            clipChildren = false
         }
 
-        // 🌟 漂亮的圆角对话框
         val bubbleBg = GradientDrawable().apply {
-            setColor(Color.parseColor("#E6192124")) // 高级深灰半透明
-            cornerRadius = 30f // 圆角
-            setStroke(2, Color.parseColor("#3A3A3A")) // 边框
+            setColor(Color.parseColor("#E6192124"))
+            cornerRadius = 30f
+            setStroke(2, Color.parseColor("#3A3A3A"))
         }
         
         tvDialogue = TextView(this).apply {
@@ -93,7 +88,7 @@ class FloatingFishService : Service() {
             textSize = 14f
             setPadding(30, 20, 30, 20)
             visibility = View.INVISIBLE
-            alpha = 0f // 初始透明，用于淡入淡出
+            alpha = 0f 
             gravity = Gravity.CENTER
             val lp = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
@@ -104,12 +99,11 @@ class FloatingFishService : Service() {
         }
         floatingView.addView(tvDialogue)
 
-        // 🌟 大肥鱼大小设置 (想要多大改这里的 600)
-        val fishSize = 600
         maidFish = ImageView(this).apply {
+            // 应用你设置的大小
             layoutParams = LinearLayout.LayoutParams(fishSize, fishSize)
             scaleType = ImageView.ScaleType.FIT_CENTER
-            setPadding(20, 20, 20, 20) // 留点边距，防止Q弹时被切
+            setPadding(20, 20, 20, 20)
         }
         floatingView.addView(maidFish)
 
@@ -129,7 +123,7 @@ class FloatingFishService : Service() {
             y = 200
         }
 
-windowManager.addView(floatingView, params)
+        windowManager.addView(floatingView, params)
         loadAssetsFiles()
         playRandomAnimation(idleList)
         setupTouchListener()
@@ -141,7 +135,7 @@ windowManager.addView(floatingView, params)
         val assetManager: AssetManager = assets
         val allFiles = assetManager.list("webp") ?: return
         for (file in allFiles) {
-            when {
+           when {
                 file.startsWith("idle") -> idleList.add(file)
                 file.startsWith("walk") -> walkList.add(file)
                 file.startsWith("sleep") -> sleepList.add(file)
@@ -196,27 +190,32 @@ windowManager.addView(floatingView, params)
                         initialTouchX = event.rawX; initialTouchY = event.rawY
                         lastTouchX = event.rawX; lastTouchY = event.rawY
                         downTime = System.currentTimeMillis()
-                        hideDialogue() // 拖拽时隐藏对话
+                        hideDialogue()
                         
-                        // 拖拽时稍微放大一点点
-                        maidFish.animate().scaleX(1.05f).scaleY(0.95f).setDuration(100).start()
+                        // 抓起时变大一点
+                        maidFish.animate().scaleX(1.1f).scaleY(1.1f).setDuration(150).start()
                         return true
                     }
                     MotionEvent.ACTION_MOVE -> {
                         params.x = initialX + (event.rawX - initialTouchX).toInt()
                         params.y = initialY + (event.rawY - initialTouchY).toInt()
                         windowManager.updateViewLayout(floatingView, params)
-                        velocityX = (event.rawX - lastTouchX) * 1.5f
+                        
+                        // 根据拖拽速度产生倾斜
+                        val deltaX = event.rawX - lastTouchX
+                        maidFish.rotation = deltaX * 1.5f // 晃动倾斜
+                        
+                        velocityX = deltaX * 1.5f
                         velocityY = (event.rawY - lastTouchY) * 1.5f
                         lastTouchX = event.rawX; lastTouchY = event.rawY
                         return true
                     }
                     MotionEvent.ACTION_UP -> {
                         isDragging = false
-                        // 恢复大小
-                        maidFish.animate().scaleX(1f).scaleY(1f).setDuration(100).start()
+                        // 松手回正
+                        maidFish.animate().scaleX(1f).scaleY(1f).rotation(0f).setDuration(150).start()
                         
-                        if (System.currentTimeMillis() - downTime < 200 && Math.abs(event.rawX - initialTouchX) < 10) {
+                        if (System.currentTimeMillis() - downTime < 200 && abs(event.rawX - initialTouchX) < 10) {
                             triggerClickInteraction()
                         } else {
                             velocityX = event.rawX - lastTouchX
@@ -237,23 +236,25 @@ windowManager.addView(floatingView, params)
                 params.x += velocityX.toInt()
                 params.y += velocityY.toInt()
 
-                // 左右边缘反弹
+                // 左右边缘
                 if (params.x <= 0) {
                     params.x = 0
                     velocityX = -velocityX * bounceFactor
+                    squash() // 撞墙挤压
                 } else if (params.x + floatingView.width >= screenWidth) {
                     params.x = screenWidth - floatingView.width
                     velocityX = -velocityX * bounceFactor
-                } else if (params.x + floatingView.width >= screenWidth) {
-                    params.x = screenWidth - floatingView.width
-                    velocityX = -velocityX * bounceFactor
+                    squash() // 撞墙挤压
                 }
 
-                // 底部和顶部反弹
+                // 上下边缘
                 if (params.y + floatingView.height >= screenHeight) {
                     params.y = screenHeight - floatingView.height
                     velocityY = -velocityY * bounceFactor
-                    if (Math.abs(velocityY) < 20) velocityY = 0f 
+                    
+                    if (abs(velocityY) > 30) squash() // 砸在地上重重挤压
+                    
+                    if (abs(velocityY) < 20) velocityY = 0f 
                     velocityX *= friction 
                 } else if (params.y <= 0) {
                     params.y = 0
@@ -265,8 +266,16 @@ windowManager.addView(floatingView, params)
         }
     }
 
+    // 🌟 物理挤压Q弹（压扁拉长）
+    private fun squash() {
+        maidFish.animate().cancel()
+        maidFish.scaleX = 1.3f
+        maidFish.scaleY = 0.7f
+        maidFish.animate().scaleX(1f).scaleY(1f).setDuration(200).start()
+    }
+
     private fun triggerClickInteraction() {
-        // 🌟 核心Q弹效果 (果冻缩放)
+        // 点击Q弹
         maidFish.animate().cancel()
         maidFish.scaleX = 0.8f
         maidFish.scaleY = 1.2f
@@ -283,7 +292,7 @@ windowManager.addView(floatingView, params)
         if (clickCount >= 5) {
             showDialogue("哎呀！少爷你点疼我了！")
             playRandomAnimation(clickList)
-            velocityY = -40f // 戳急了会跳起来
+            velocityY = -40f
             clickCount = 0
         } else {
             playRandomAnimation(if (clickList.isNotEmpty()) clickList else idleList)
@@ -292,18 +301,16 @@ windowManager.addView(floatingView, params)
         }
     }
 
-    // 🌟 平滑显示对话框（防闪烁）
     private fun showDialogue(text: String) {
         tvDialogue.text = text
-        tvDialogue.animate().cancel() // 取消上一个动画
+        tvDialogue.animate().cancel() 
         tvDialogue.visibility = View.VISIBLE
         tvDialogue.animate().alpha(1f).setDuration(200).start()
         
         handler.removeCallbacks(hideDialogueRunnable)
-        handler.postDelayed(hideDialogueRunnable, 3000) // 3秒后消失
+        handler.postDelayed(hideDialogueRunnable, 3000) 
     }
 
-    // 🌟 平滑隐藏对话框
     private fun hideDialogue() {
         tvDialogue.animate().cancel()
         tvDialogue.animate().alpha(0f).setDuration(200).withEndAction {
