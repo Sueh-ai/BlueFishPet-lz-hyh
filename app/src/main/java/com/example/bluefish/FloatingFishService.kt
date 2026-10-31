@@ -29,12 +29,13 @@ class FloatingFishService : Service() {
     private lateinit var tvDialogue: TextView
     private val handler = Handler(Looper.getMainLooper())
 
+    // 物理参数优化
     private var velocityX = 0f
     private var velocityY = 0f
     private var isDragging = false
-    private var gravity = 20f
-    private var bounceFactor = -0.8f // 弹力
-    private var friction = 0.96f // 摩擦
+    private var gravity = 25f // 重力稍微加大，落地更干脆
+    private var bounceFactor = -0.7f // 碰撞能量损耗，保证来回弹几次后平稳停下
+    private var friction = 0.98f // 地面摩擦力
     private var screenWidth = 0
     private var screenHeight = 0
 
@@ -48,12 +49,7 @@ class FloatingFishService : Service() {
         "我亲爱的黎子少爷", "今天还爱我", "我好想你", 
         "少爷，你终于来看我啦！", "一直盯着你看，都不好意思了...", "最喜欢少爷摸我头了~",
         "黎子少爷今天也很帅气呢！", "只要能在少爷身边，大肥鱼就很开心了。", "少爷，你要去哪儿呀？带上我好不好？",
-        "偷偷亲少爷一下，嘿嘿~", "今天也想和少爷贴贴！", "少爷，你摸摸我的心跳，好快呀。",
-        "外面风好大，少爷快躲到我身后！", "哼，怎么现在才来找我？", "别拽我尾巴啦，要秃了！",
-        "哎呀！你弄乱我的头发了！", "少爷，你点得我头好晕呀...", "再戳我，大肥鱼可要生气了哦！",
-        "笨蛋少爷，我才没有想你！", "走开走开，我要睡觉啦。", "少爷，你是不是又忘记喂我了？",
-        "不理你了，除非你拿小鱼干来哄我！", "大肥鱼也是有脾气的！", "我是大肥鱼，会吐泡泡的那种哦！",
-        "今天的网速好像有点慢呢。", "少爷，今天中午吃什么呀？", "救命，我卡在屏幕边缘了！"
+        "偷偷亲少爷一下，嘿嘿~", "今天也想和少爷贴贴！", "少爷，你摸摸我的心跳，好快呀。"
     )
     private val idleLines = listOf("好无聊呀...", "今天天气真好。")
     private val sleepLines = listOf("呼...呼...", "Zzz...")
@@ -66,7 +62,6 @@ class FloatingFishService : Service() {
         super.onCreate()
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
         
-        // 读取你在 MainActivity 里设置的大小
         val prefs = getSharedPreferences("fish_prefs", MODE_PRIVATE)
         val fishSize = prefs.getInt("fish_size", 600)
 
@@ -100,7 +95,6 @@ class FloatingFishService : Service() {
         floatingView.addView(tvDialogue)
 
         maidFish = ImageView(this).apply {
-            // 应用你设置的大小
             layoutParams = LinearLayout.LayoutParams(fishSize, fishSize)
             scaleType = ImageView.ScaleType.FIT_CENTER
             setPadding(20, 20, 20, 20)
@@ -128,14 +122,14 @@ class FloatingFishService : Service() {
         playRandomAnimation(idleList)
         setupTouchListener()
         handler.post(physicsRunnable)
-        handler.postDelayed(stateMachineRunnable, 10000) 
+        handler.postDelayed(stateMachineRunnable, 5000) // 5秒后开始自己玩
     }
 
     private fun loadAssetsFiles() {
         val assetManager: AssetManager = assets
         val allFiles = assetManager.list("webp") ?: return
         for (file in allFiles) {
-           when {
+            when {
                 file.startsWith("idle") -> idleList.add(file)
                 file.startsWith("walk") -> walkList.add(file)
                 file.startsWith("sleep") -> sleepList.add(file)
@@ -152,23 +146,41 @@ class FloatingFishService : Service() {
         }
     }
 
+    // 🌟 状态机：每隔一段时间改变状态（自己跑）
     private val stateMachineRunnable = object : Runnable {
         override fun run() {
             if (!isDragging) {
                 currentState = when (Random.nextInt(100)) {
-                    in 0..40 -> "IDLE"   
-                    in 41..70 -> "WALK"  
+                    in 0..30 -> "IDLE"   
+                    in 31..70 -> "WALK"  // 增加走路概率
                     in 71..85 -> "PLAY"  
                     else -> "SLEEP"      
                 }
                 when (currentState) {
-                    "IDLE" -> { playRandomAnimation(idleList); velocityX = 0f }
-                    "WALK" -> { playRandomAnimation(walkList); velocityX = if (Random.nextBoolean()) 15f else -15f }
-                    "PLAY" -> { playRandomAnimation(playList); velocityY = -30f }
-                    "SLEEP" -> { playRandomAnimation(sleepList); velocityX = 0f; showDialogue(sleepLines[Random.nextInt(sleepLines.size)]) }
+                    "IDLE" -> { 
+                        playRandomAnimation(idleList)
+                        // 不加水平速度，靠摩擦力自然停下
+                    }
+                    "WALK" -> { 
+                        playRandomAnimation(walkList)
+                        // 给一个随机的水平移动速度，让她自己在屏幕上跑
+                        velocityX = if (Random.nextBoolean()) Random.nextInt(10, 20).toFloat() else -Random.nextInt(10, 20).toFloat()
+                    }
+                    "PLAY" -> { 
+                        playRandomAnimation(playList)
+                        // 开心地跳一下
+                        if (params.y + floatingView.height >= screenHeight - 10) {
+                            velocityY = -35f 
+                        }
+                    }
+                    "SLEEP" -> { 
+                        playRandomAnimation(sleepList)
+                        velocityX = 0f
+                        showDialogue(sleepLines[Random.nextInt(sleepLines.size)])
+                    }
                 }
             }
-            handler.postDelayed(this, 10000) 
+            handler.postDelayed(this, 6000) // 每6秒换一次状态
         }
     }
 
@@ -191,8 +203,7 @@ class FloatingFishService : Service() {
                         lastTouchX = event.rawX; lastTouchY = event.rawY
                         downTime = System.currentTimeMillis()
                         hideDialogue()
-                        
-                        // 抓起时变大一点
+                        // 抓起时稍微放大，绝不倾斜
                         maidFish.animate().scaleX(1.1f).scaleY(1.1f).setDuration(150).start()
                         return true
                     }
@@ -201,25 +212,21 @@ class FloatingFishService : Service() {
                         params.y = initialY + (event.rawY - initialTouchY).toInt()
                         windowManager.updateViewLayout(floatingView, params)
                         
-                        // 根据拖拽速度产生倾斜
-                        val deltaX = event.rawX - lastTouchX
-                        maidFish.rotation = deltaX * 1.5f // 晃动倾斜
-                        
-                        velocityX = deltaX * 1.5f
+                        velocityX = (event.rawX - lastTouchX) * 1.5f
                         velocityY = (event.rawY - lastTouchY) * 1.5f
                         lastTouchX = event.rawX; lastTouchY = event.rawY
                         return true
                     }
                     MotionEvent.ACTION_UP -> {
                         isDragging = false
-                        // 松手回正
-                        maidFish.animate().scaleX(1f).scaleY(1f).rotation(0f).setDuration(150).start()
+                        maidFish.animate().scaleX(1f).scaleY(1f).setDuration(150).start()
                         
                         if (System.currentTimeMillis() - downTime < 200 && abs(event.rawX - initialTouchX) < 10) {
                             triggerClickInteraction()
                         } else {
-                            velocityX = event.rawX - lastTouchX
-                            velocityY = event.rawY - lastTouchY
+                            // 松手时，赋予甩出去的初速度
+                            velocityX = (event.rawX - lastTouchX) * 2.0f // 加一点惯性
+                            velocityY = (event.rawY - lastTouchY) * 2.0f
                         }
                         return true
                     }
@@ -229,53 +236,62 @@ class FloatingFishService : Service() {
         })
     }
 
+    // 🌟 纯物理引擎（严格遵循重力、反弹、摩擦力）
     private val physicsRunnable = object : Runnable {
         override fun run() {
             if (!isDragging) {
+                // 重力加速度
                 velocityY += gravity / 10f
+                
+                // 应用速度更新位置
                 params.x += velocityX.toInt()
                 params.y += velocityY.toInt()
 
-                // 左右边缘
+                // 1. 左右边缘碰撞（立即反弹，改变方向，速度衰减）
                 if (params.x <= 0) {
                     params.x = 0
                     velocityX = -velocityX * bounceFactor
-                    squash() // 撞墙挤压
                 } else if (params.x + floatingView.width >= screenWidth) {
                     params.x = screenWidth - floatingView.width
                     velocityX = -velocityX * bounceFactor
-                    squash() // 撞墙挤压
                 }
 
-                // 上下边缘
+                // 2. 底部地面碰撞（关键：来回反弹最后平稳落地）
                 if (params.y + floatingView.height >= screenHeight) {
                     params.y = screenHeight - floatingView.height
-                    velocityY = -velocityY * bounceFactor
                     
-                    if (abs(velocityY) > 30) squash() // 砸在地上重重挤压
-                    
-                    if (abs(velocityY) < 20) velocityY = 0f 
-                    velocityX *= friction 
+                    // 如果下落速度极快，反弹！
+                    if (abs(velocityY) > 15f) {
+                        velocityY = -velocityY * bounceFactor
+                        squash() // 触地挤压形变
+                    } else {
+                        // 速度太小，平稳落地，停止垂直运动
+                        velocityY = 0f
+                        // 在地面时，地面摩擦力生效，慢慢停止水平滑动
+                        velocityX *= friction
+                        if (abs(velocityX) < 0.5f) velocityX = 0f // 彻底停下
+                    }
                 } else if (params.y <= 0) {
+                    // 顶部碰撞
                     params.y = 0
                     velocityY = -velocityY * bounceFactor
                 }
+
                 windowManager.updateViewLayout(floatingView, params)
             }
             handler.postDelayed(this, 16)
         }
     }
 
-    // 🌟 物理挤压Q弹（压扁拉长）
+    // 物理挤压形变（不旋转）
     private fun squash() {
         maidFish.animate().cancel()
-        maidFish.scaleX = 1.3f
-        maidFish.scaleY = 0.7f
+        maidFish.scaleX = 1.2f
+        maidFish.scaleY = 0.8f
         maidFish.animate().scaleX(1f).scaleY(1f).setDuration(200).start()
     }
 
     private fun triggerClickInteraction() {
-        // 点击Q弹
         maidFish.animate().cancel()
         maidFish.scaleX = 0.8f
         maidFish.scaleY = 1.2f
@@ -306,7 +322,6 @@ class FloatingFishService : Service() {
         tvDialogue.animate().cancel() 
         tvDialogue.visibility = View.VISIBLE
         tvDialogue.animate().alpha(1f).setDuration(200).start()
-        
         handler.removeCallbacks(hideDialogueRunnable)
         handler.postDelayed(hideDialogueRunnable, 3000) 
     }
