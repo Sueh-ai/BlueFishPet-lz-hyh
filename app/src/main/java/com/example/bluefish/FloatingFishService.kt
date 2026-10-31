@@ -34,19 +34,21 @@ class FloatingFishService : Service(), SensorEventListener {
     private lateinit var tvDialogue: TextView
     private val handler = Handler(Looper.getMainLooper())
 
-    // 🌟 传感器相关
+    // 摇晃传感器
     private lateinit var sensorManager: SensorManager
     private var accelerometer: Sensor? = null
-    private var sensorX = 0f
-    private var sensorY = 0f
+    private var lastShakeTime = 0L
+    private var lastX = 0f
+    private var lastY = 0f
+    private var lastZ = 0f
 
     // 物理参数
     private var velocityX = 0f
     private var velocityY = 0f
     private var isDragging = false
-    private var gravity = 25f
-    private var bounceFactor = -0.65f
-    private var friction = 0.96f
+    private var gravity = 15f 
+    private var bounceFactor = -0.6f 
+    private var friction = 0.95f
     private var screenWidth = 0
     private var screenHeight = 0
 
@@ -59,9 +61,9 @@ class FloatingFishService : Service(), SensorEventListener {
     private val clickLines = listOf(
         "我亲爱的黎子少爷", "今天还爱我", "我好想你", 
         "少爷，你终于来看我啦！", "一直盯着你看，都不好意思了...", "最喜欢少爷摸我头了~",
-        "黎子少爷今天也很帅气呢！", "只要能在少爷身边，大肥鱼就很开心了。", "少爷，你要去哪儿呀？带上我好不好？",
-        "偷偷亲少爷一下，嘿嘿~", "今天也想和少爷贴贴！", "少爷，你摸摸我的心跳，好快呀。", "别拽我尾巴啦，要秃了！", "哼，怎么现在才来找我？"
+        "黎子少爷今天也很帅气呢！", "只要能在少爷身边，大肥鱼就很开心了。", "少爷，你要去哪儿呀？带上我好不好？"
     )
+    private val shakeLines = listOf("哎呀！地震了吗？", "晃得我头晕眼花...", "少爷别摇啦！", "救命呀！我要飞出去了！")
     private val idleLines = listOf("好无聊呀...", "今天天气真好。")
     private val sleepLines = listOf("呼...呼...", "Zzz...")
 
@@ -73,7 +75,7 @@ class FloatingFishService : Service(), SensorEventListener {
         super.onCreate()
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
         
-        // 初始化重力传感器
+        // 注册传感器
         sensorManager = getSystemService(SENSOR_SERVICE) as SensorManager
         accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
         accelerometer?.let {
@@ -107,8 +109,7 @@ class FloatingFishService : Service(), SensorEventListener {
                 LinearLayout.LayoutParams.WRAP_CONTENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
             )
-            // 🌟 修复气泡距离：把 margin 改成负数，让她俩贴贴！
-            lp.bottomMargin = -20 
+            lp.bottomMargin = -10 
             layoutParams = lp
         }
         floatingView.addView(tvDialogue)
@@ -136,20 +137,40 @@ class FloatingFishService : Service(), SensorEventListener {
             y = 200
         }
 
-        windowManager.addView(floatingView, params)
+       windowManager.addView(floatingView, params)
         loadAssetsFiles()
         playRandomAnimation(idleList)
         setupTouchListener()
+        
         handler.post(physicsRunnable)
-        handler.postDelayed(stateMachineRunnable, 5000)
+        handler.postDelayed(stateMachineRunnable, 4000)
     }
 
-    // 传感器回调：实时获取手机的倾斜角度
+    // 摇晃检测
     override fun onSensorChanged(event: SensorEvent?) {
         if (event?.sensor?.type == Sensor.TYPE_ACCELEROMETER) {
-            // 手机倾斜时，改变重力方向
-            sensorX = -event.values[0] // 左右倾斜
-            sensorY = event.values[1]  // 前后倾斜
+            val x = event.values[0]
+            val y = event.values[1]
+            val z = event.values[2]
+
+            val currentTime = System.currentTimeMillis()
+            if ((currentTime - lastShakeTime) > 500) {
+                val deltaX = abs(x - lastX)
+                val deltaY = abs(y - lastY)
+                val deltaZ = abs(z - lastZ)
+                val speed = sqrt((deltaX * deltaX + deltaY * deltaY + deltaZ * deltaZ).toDouble()).toFloat()
+
+                if (speed > 15f && !isDragging) {
+                    lastShakeTime = currentTime
+                    handler.post {
+                        playRandomAnimation(playList)
+                        showDialogue(shakeLines[Random.nextInt(shakeLines.size)])
+                        velocityY = -Random.nextInt(25, 40).toFloat()
+                        velocityX = Random.nextInt(-25, 25).toFloat()
+                    }
+                }
+            }
+            lastX = x; lastY = y; lastZ = z
         }
     }
 
@@ -180,24 +201,21 @@ class FloatingFishService : Service(), SensorEventListener {
         override fun run() {
             if (!isDragging) {
                 currentState = when (Random.nextInt(100)) {
-                    in 0..30 -> "IDLE"   
-                    in 31..70 -> "WALK"  
-                    in 71..85 -> "PLAY"  
+                    in 0..40 -> "IDLE"   
+                    in 41..70 -> "WALK"  
+                    in 71..90 -> "PLAY"  
                     else -> "SLEEP"      
                 }
                 when (currentState) {
-                    "IDLE" -> { 
-                        playRandomAnimation(idleList)
-                    }
+                    "IDLE" -> { playRandomAnimation(idleList) }
                     "WALK" -> { 
                         playRandomAnimation(walkList)
-                        velocityX = if (Random.nextBoolean()) Random.nextInt(10, 20).toFloat() else -Random.nextInt(10, 20).toFloat()
+                        velocityX = if (Random.nextBoolean()) Random.nextInt(5, 12).toFloat() else -Random.nextInt(5, 12).toFloat()
                     }
                     "PLAY" -> { 
                         playRandomAnimation(playList)
-                        if (params.y + floatingView.height >= screenHeight - 10) {
-                            velocityY = -35f 
-                        }
+                        velocityY = -25f 
+                        velocityX = Random.nextInt(-15, 15).toFloat()
                     }
                     "SLEEP" -> { 
                         playRandomAnimation(sleepList)
@@ -206,7 +224,7 @@ class FloatingFishService : Service(), SensorEventListener {
                     }
                 }
             }
-            handler.postDelayed(this, 6000) 
+            handler.postDelayed(this, 5000) 
         }
     }
 
@@ -229,7 +247,6 @@ class FloatingFishService : Service(), SensorEventListener {
                         lastTouchX = event.rawX; lastTouchY = event.rawY
                         downTime = System.currentTimeMillis()
                         hideDialogue()
-                        maidFish.animate().scaleX(1.1f).scaleY(1.1f).setDuration(150).start()
                         return true
                     }
                     MotionEvent.ACTION_MOVE -> {
@@ -244,14 +261,11 @@ class FloatingFishService : Service(), SensorEventListener {
                     }
                     MotionEvent.ACTION_UP -> {
                         isDragging = false
-                        maidFish.animate().scaleX(1f).scaleY(1f).setDuration(150).start()
-                        
                         if (System.currentTimeMillis() - downTime < 200 && abs(event.rawX - initialTouchX) < 10) {
                             triggerClickInteraction()
                         } else {
-                            // 🌟 甩出去的惯性：加大力度，指哪飞哪
-                            velocityX = (event.rawX - lastTouchX) * 3.0f
-                            velocityY = (event.rawY - lastTouchY) * 3.0f
+                            velocityX = (event.rawX - lastTouchX) * 2.0f
+                            velocityY = (event.rawY - lastTouchY) * 2.0f
                         }
                         return true
                     }
@@ -264,22 +278,10 @@ class FloatingFishService : Service(), SensorEventListener {
     private val physicsRunnable = object : Runnable {
         override fun run() {
             if (!isDragging) {
-                // 🌟 核心：加入重力传感器的影响
-                // sensorX (左右倾斜) 会让鱼左右滑动，sensorY (上下倾斜) 会让她加速下落或起飞
-                velocityX += sensorX * 0.8f 
-                velocityY += sensorY * 0.8f + (gravity / 10f)
-
-                // 速度上限限制（防止手机猛晃导致她飞出屏幕）
-                val maxSpeed = 60f
-                if (velocityX > maxSpeed) velocityX = maxSpeed
-                if (velocityX < -maxSpeed) velocityX = -maxSpeed
-                if (velocityY > maxSpeed) velocityY = maxSpeed
-                if (velocityY < -maxSpeed) velocityY = -maxSpeed
-
+                velocityY += gravity / 10f
                 params.x += velocityX.toInt()
                 params.y += velocityY.toInt()
 
-                // 左右碰撞
                 if (params.x <= 0) {
                     params.x = 0
                     velocityX = -velocityX * bounceFactor
@@ -288,19 +290,15 @@ class FloatingFishService : Service(), SensorEventListener {
                     velocityX = -velocityX * bounceFactor
                 }
 
-                // 底部碰撞与落地
                 if (params.y + floatingView.height >= screenHeight) {
                     params.y = screenHeight - floatingView.height
-                    
                     if (abs(velocityY) > 15f) {
                         velocityY = -velocityY * bounceFactor
-                        squash() 
+                        cuteSquash() 
                     } else {
-                        // 🌟 平稳落地
                         velocityY = 0f
                         velocityX *= friction
-                        // 当水平速度很小，并且手机不倾斜时，彻底停下
-                        if (abs(velocityX) < 0.5f && abs(sensorX) < 1.0f) velocityX = 0f 
+                        if (abs(velocityX) < 0.5f) velocityX = 0f 
                     }
                 } else if (params.y <= 0) {
                     params.y = 0
@@ -313,17 +311,18 @@ class FloatingFishService : Service(), SensorEventListener {
         }
     }
 
-    private fun squash() {
+    // 轻微Q弹防压扁
+    private fun cuteSquash() {
         maidFish.animate().cancel()
-        maidFish.scaleX = 1.2f
-        maidFish.scaleY = 0.8f
-        maidFish.animate().scaleX(1f).scaleY(1f).setDuration(200).start()
+        maidFish.scaleX = 1.1f
+        maidFish.scaleY = 0.9f
+        maidFish.animate().scaleX(1f).scaleY(1f).setDuration(150).start()
     }
 
     private fun triggerClickInteraction() {
         maidFish.animate().cancel()
-        maidFish.scaleX = 0.8f
-        maidFish.scaleY = 1.2f
+        maidFish.scaleX = 0.85f
+        maidFish.scaleY = 1.15f
         maidFish.animate().scaleX(1f).scaleY(1f).setDuration(300).start()
 
         val currentTime = System.currentTimeMillis()
@@ -369,8 +368,7 @@ class FloatingFishService : Service(), SensorEventListener {
     override fun onDestroy() {
         super.onDestroy()
         handler.removeCallbacksAndMessages(null)
-        // 注销传感器，节约电量
         sensorManager.unregisterListener(this)
         if (floatingView.isAttachedToWindow) windowManager.removeView(floatingView)
     }
-}
+} 
