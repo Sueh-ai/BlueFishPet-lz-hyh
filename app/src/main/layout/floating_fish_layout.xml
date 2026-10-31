@@ -3,10 +3,7 @@
     android:layout_width="wrap_content"
     android:layout_height="wrap_content"
     android:orientation="vertical"
-    android:gravity="center_horizontal"
-    android:clipChildren="false"
-    android:clipToPadding="false">
-    
+    android:gravity="center_horizontal">
     <TextView
         android:id="@+id/tv_dialogue"
         android:layout_width="wrap_content"
@@ -17,7 +14,6 @@
         android:textSize="14sp"
         android:visibility="gone"
         android:layout_marginBottom="8dp" />
-        
     <ImageView
         android:id="@+id/iv_fish"
         android:layout_width="150dp"
