@@ -52,10 +52,10 @@ class FloatingFishService : Service(), SensorEventListener {
     private var gravityDirX = 0f
     private var gravityDirY = 1f
     
-    private val gravityBase = 0.3f // 稍微加大基础重力，让她更有冲劲
-    private val airFriction = 0.98f 
-    private val restitution = 0.7f  // 提高弹性系数
-    private val minBounceSpeedY = 1.0f 
+    private val gravityBase = 0.35f // 稍微加大一点点下落重力
+    private val airFriction = 0.995f // 🌟 空气阻力大幅减小（原0.98），飞得更远
+    private val restitution = 0.9f   // 🌟 反弹能量保留 90%（原0.7），超级弹
+    private val minBounceSpeedY = 0.5f // 降低停止阈值，让她更晚停下
     
     private var screenWidth = 0
     private var screenHeight = 0
@@ -291,11 +291,12 @@ floatingView.addView(tvDialogue)
                 // 🌟 左右碰撞：保底弹射初速度加大到 6f，轻轻碰到就弹回去
                 if (params.x <= 0) {
                     params.x = 0
-                    velocityX = abs(velocityX) * restitution + 6f 
+                    // 🌟 基础弹力从 6f 提升到 15f，保证每次撞墙都像弹力球一样弹飞
+                    velocityX = abs(velocityX) * restitution + 15f 
                     hitEdge = true
                 } else if (params.x + fishSize >= screenWidth) {
                     params.x = screenWidth - fishSize
-                    velocityX = -(abs(velocityX) * restitution + 6f)
+                    velocityX = -(abs(velocityX) * restitution + 15f)
                     hitEdge = true
                 }
 
