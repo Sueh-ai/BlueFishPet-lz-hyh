@@ -24,7 +24,7 @@ class MainActivity : AppCompatActivity() {
         val rootLayout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             background = bgDrawable
-            setPadding(50, 150, 50, 50)
+            setPadding(50, 100, 50, 50)
             gravity = android.view.Gravity.CENTER_HORIZONTAL
         }
 
@@ -53,7 +53,7 @@ class MainActivity : AppCompatActivity() {
         cardLayout.addView(tvTitle)
 
         val tvSubtitle = TextView(this).apply {
-            text = "轻飘飘的弹簧果冻"
+            text = "随手机倾斜的重力精灵"
             textSize = 14f
             setTextColor(Color.parseColor("#FFD700"))
             setPadding(0, 10, 0, 40)
@@ -61,7 +61,7 @@ class MainActivity : AppCompatActivity() {
         cardLayout.addView(tvSubtitle)
 
         val tvSizeShow = TextView(this).apply {
-            text = "体型大小：600"
+            text = "体型大小：800"
             textSize = 16f
             setTextColor(Color.parseColor("#CCCCCC"))
             setPadding(0, 20, 0, 20)
@@ -69,8 +69,8 @@ class MainActivity : AppCompatActivity() {
         cardLayout.addView(tvSizeShow)
 
         val seekBar = SeekBar(this).apply {
-            max = 800
-            progress = 600
+            max = 1200
+            progress = 800 // 🌟 默认放大
             progressTintList = android.content.res.ColorStateList.valueOf(Color.parseColor("#FFD700"))
             thumbTintList = android.content.res.ColorStateList.valueOf(Color.parseColor("#FFD700"))
         }
@@ -96,16 +96,20 @@ class MainActivity : AppCompatActivity() {
 
         rootLayout.addView(cardLayout)
 
-        val spacer = android.view.View(this)
-        rootLayout.addView(spacer, LinearLayout.LayoutParams(1, 0, 1f))
-
+        // 🌟 情话放在正中间
         val tvLove = TextView(this).apply {
             text = "我最最亲爱的黎子少爷，\n这是我为你做的，独属于你的鲸鱼娘，爱你😘"
-            textSize = 16f
+            textSize = 18f
             setTextColor(Color.parseColor("#FFD700"))
             gravity = android.view.Gravity.CENTER
             setLineSpacing(20f, 1f)
-            setPadding(0, 0, 0, 100)
+            val lp = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                0,
+                1f
+            )
+            lp.topMargin = 50
+            layoutParams = lp
         }
         rootLayout.addView(tvLove)
 
@@ -120,7 +124,7 @@ class MainActivity : AppCompatActivity() {
         setContentView(rootLayout)
 
         btnStart.setOnClickListener {
-            val finalSize = if (seekBar.progress > 200) seekBar.progress else 600
+            val finalSize = if (seekBar.progress > 200) seekBar.progress else 800
             getSharedPreferences("fish_prefs", MODE_PRIVATE).edit()
                 .putInt("fish_size", finalSize).apply()
 
