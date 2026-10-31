@@ -3,15 +3,20 @@
 
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <!-- 🌟 新增：Android 14+ 必须声明前台服务类型 -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <!-- 🌟 新增：通知权限（高版本安卓保活必须） -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
         android:allowBackup="true"
-        android:icon="@drawable/ic_launcher_fish" 
         android:label="大肥鱼桌宠"
         android:theme="@style/Theme.AppCompat.Light.NoActionBar">
         
+        <!-- 🌟 重点：excludeFromRecents="true" 让App不出现在最近任务里 -->
         <activity
             android:name=".MainActivity"
+            android:excludeFromRecents="true"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -19,7 +24,10 @@
             </intent-filter>
         </activity>
 
-        <service android:name=".FloatingFishService" />
+        <!-- 🌟 声明前台服务 -->
+        <service 
+            android:name=".FloatingFishService"
+            android:foregroundServiceType="specialUse" />
         
     </application>
 </manifest>
