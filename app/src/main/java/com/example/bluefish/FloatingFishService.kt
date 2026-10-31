@@ -1,4 +1,4 @@
-package com.example.bluefish //
+package com.example.bluefish
 
 import android.app.Service
 import android.content.Intent
@@ -26,29 +26,24 @@ class FloatingFishService : Service() {
     private lateinit var tvDialogue: TextView
     private val handler = Handler(Looper.getMainLooper())
 
-    // 物理参数
     private var velocityX = 0f
     private var velocityY = 0f
     private var isDragging = false
-    private var gravity = 20f 
-    private var bounceFactor = -0.65f 
-    private var friction = 0.95f 
+    private var gravity = 20f
+    private var bounceFactor = -0.65f
+    private var friction = 0.95f
     private var screenWidth = 0
     private var screenHeight = 0
 
-    // 素材列表
     private val idleList = mutableListOf<String>()
     private val walkList = mutableListOf<String>()
     private val sleepList = mutableListOf<String>()
     private val playList = mutableListOf<String>()
     private val clickList = mutableListOf<String>()
 
-    // 🌟 台词库：把你想要的 350 条全塞在这个括号里，加在下面就行！
     private val clickLines = listOf(
         "我亲爱的黎子少爷", "今天还爱我", "我好想你", 
         "哎呀，别拽我！", "主人，你在干嘛呀？", "哼，不理你了！"
-        // 👇 在这里继续加台词，一行一条，记得后面加英文逗号
-        // "少爷今天真帅", "不要再摸啦~"
     )
     private val idleLines = listOf("好无聊呀...", "今天天气真好。", "少爷怎么不理我...")
     private val sleepLines = listOf("呼...呼...", "Zzz...", "梦里也有少爷呢...")
@@ -133,4 +128,8 @@ class FloatingFishService : Service() {
                     "SLEEP" -> { 
                         playRandomAnimation(sleepList)
                         velocityX = 0f
-                    }              }              }
+                        showDialogue(sleepLines[Random.nextInt(sleepLines.size)])
+                    }
+                }
+            }
+            handler.post
