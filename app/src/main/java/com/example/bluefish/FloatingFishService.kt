@@ -3,24 +3,25 @@ package com.example.bluefish
 import android.app.Service
 import android.content.Intent
 import android.content.res.AssetManager
+import android.graphics.Color
 import android.graphics.PixelFormat
 import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.view.Gravity
-import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
 import android.widget.ImageView
+import android.widget.LinearLayout
 import android.widget.TextView
 import com.bumptech.glide.Glide
 import kotlin.random.Random
 
 class FloatingFishService : Service() {
     private lateinit var windowManager: WindowManager
-    private lateinit var floatingView: View
+    private lateinit var floatingView: LinearLayout // 改为 LinearLayout
     private lateinit var params: WindowManager.LayoutParams
     private lateinit var maidFish: ImageView
     private lateinit var tvDialogue: TextView
@@ -42,62 +43,24 @@ class FloatingFishService : Service() {
     private val clickList = mutableListOf<String>()
 
     private val clickLines = listOf(
-    // 🌟 你指定的专属核心台词
-    "我亲爱的黎子少爷",
-    "今天还爱我",
-    "我好想你",
-    
-    // 💖 撒娇/深情
-    "少爷，你终于来看我啦！",
-    "一直盯着你看，都不好意思了...",
-    "最喜欢少爷摸我头了~",
-    "黎子少爷今天也很帅气呢！",
-    "只要能在少爷身边，大肥鱼就很开心了。",
-    "少爷，你要去哪儿呀？带上我好不好？",
-    "偷偷亲少爷一下，嘿嘿~",
-    "今天也想和少爷贴贴！",
-    "少爷，你摸摸我的心跳，好快呀。",
-    "外面风好大，少爷快躲到我身后！",
-    
-    // 😤 傲娇/小脾气
-    "哼，怎么现在才来找我？",
-    "别拽我尾巴啦，要秃了！",
-    "哎呀！你弄乱我的头发了！",
-    "少爷，你点得我头好晕呀...",
-    "再戳我，大肥鱼可要生气了哦！",
-    "笨蛋少爷，我才没有想你！",
-    "走开走开，我要睡觉啦。",
-    "少爷，你是不是又忘记喂我了？",
-    "不理你了，除非你拿小鱼干来哄我！",
-    "大肥鱼也是有脾气的！",
-    
-    // 🐟 日常/搞笑
-    "我是大肥鱼，会吐泡泡的那种哦！",
-    "今天的网速好像有点慢呢。",
-    "少爷，今天中午吃什么呀？",
-    "救命，我卡在屏幕边缘了！",
-    "如果少爷每天都能陪我玩就好了。",
-    "我是不是全宇宙最可爱的女仆？",
-    "黎子少爷，工作辛苦啦，休息一下吧。",
-    "滴——电量不足，需要少爷的亲亲充电。",
-    "我要在屏幕上跑圈圈啦！",
-    "今天也是努力学习做女仆的一天！",
-    "少爷，你看我新学的舞步好看吗？",
-    "盯——(●'◡'●)",
-    "不知道少爷的脑袋里在想什么呢？",
-    "如果我不听话，少爷会赶我走吗？",
-    "虽然我胖胖的，但是我跑得快呀！",
-    "少爷，别熬夜啦，快去睡觉！",
-    "我最大的梦想，就是一直陪在少爷身边。",
-    "今天也是被黎子少爷迷倒的一天。",
-    "偷偷告诉你，其实我是一条美人鱼~",
-    "少爷少爷，快看！那里有只小猫！",
-    "我刚刚是不是很没形象地摔倒了？",
-    "少爷，你要是再不理我，我就哭给你看！",
-    "大肥鱼想睡觉了，要抱抱才肯睡...",
-    "其实我有点怕黑，少爷别关灯。",
-    "少爷，我今天表现得好不好呀？"
-)
+        "我亲爱的黎子少爷", "今天还爱我", "我好想你", 
+        "哎呀，别拽我！", "主人，你在干嘛呀？", "哼，不理你了！",
+        "少爷，你终于来看我啦！", "最喜欢少爷摸我头了~", "黎子少爷今天也很帅气呢！",
+        "只要能在少爷身边，大肥鱼就很开心了。", "少爷，你要去哪儿呀？带上我好不好？",
+        "偷偷亲少爷一下，嘿嘿~", "今天也想和少爷贴贴！", "少爷，你摸摸我的心跳，好快呀。",
+        "外面风好大，少爷快躲到我身后！", "哼，怎么现在才来找我？", "别拽我尾巴啦，要秃了！",
+        "哎呀！你弄乱我的头发了！", "少爷，你点得我头好晕呀...", "再戳我，大肥鱼可要生气了哦！",
+        "笨蛋少爷，我才没有想你！", "走开走开，我要睡觉啦。", "少爷，你是不是又忘记喂我了？",
+        "不理你了，除非你拿小鱼干来哄我！", "大肥鱼也是有脾气的！", "我是大肥鱼，会吐泡泡的那种哦！",
+        "今天的网速好像有点慢呢。", "少爷，今天中午吃什么呀？", "救命，我卡在屏幕边缘了！",
+        "如果少爷每天都能陪我玩就好了。", "我是不是全宇宙最可爱的女仆？", "黎子少爷，工作辛苦啦，休息一下吧。",
+        "滴——电量不足，需要少爷的亲亲充电。", "我要在屏幕上跑圈圈啦！", "少爷，你看我新学的舞步好看吗？",
+        "盯——(●'◡'●)", "不知道少爷的脑袋里在想什么呢？", "如果我不听话，少爷会赶我走吗？",
+        "虽然我胖胖的，但是我跑得快呀！", "少爷，别熬夜啦，快去睡觉！", "我最大的梦想，就是一直陪在少爷身边。",
+        "今天也是被黎子少爷迷倒的一天。", "偷偷告诉你，其实我是一条美人鱼~", "少爷少爷，快看！那里有只小猫！",
+        "我刚刚是不是很没形象地摔倒了？", "少爷，你要是再不理我，我就哭给你看！", "大肥鱼想睡觉了，要抱抱才肯睡...",
+        "其实我有点怕黑，少爷别关灯。", "少爷，我今天表现得好不好呀？"
+    )
     private val idleLines = listOf("好无聊呀...", "今天天气真好。", "少爷怎么不理我...")
     private val sleepLines = listOf("呼...呼...", "Zzz...", "梦里也有少爷呢...")
 
@@ -108,10 +71,37 @@ class FloatingFishService : Service() {
     override fun onCreate() {
         super.onCreate()
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
-        floatingView = LayoutInflater.from(this).inflate(R.layout.floating_fish_layout, null)
-        maidFish = floatingView.findViewById(R.id.iv_fish)
-        tvDialogue = floatingView.findViewById(R.id.tv_dialogue)
 
+        // 🌟 纯代码构建 UI，不再依赖 XML 文件！
+        floatingView = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_HORIZONTAL
+        }
+
+        // 1. 创建台词文本框
+        tvDialogue = TextView(this).apply {
+            setBackgroundColor(Color.parseColor("#CC000000")) // 半透明黑底
+            setTextColor(Color.WHITE)
+            textSize = 14f
+            setPadding(20, 10, 20, 10)
+            visibility = View.GONE
+            val params = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+            params.bottomMargin = 20
+            layoutParams = params
+        }
+        floatingView.addView(tvDialogue)
+
+        // 2. 创建图片控件
+        maidFish = ImageView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(350, 350) // 350x350 像素
+            scaleType = ImageView.ScaleType.FIT_CENTER
+        }
+        floatingView.addView(maidFish)
+
+        // 3. 设置悬浮窗参数
         val displayMetrics = resources.displayMetrics
         screenWidth = displayMetrics.widthPixels
         screenHeight = displayMetrics.heightPixels
@@ -136,8 +126,7 @@ class FloatingFishService : Service() {
         handler.post(physicsRunnable)
         handler.postDelayed(stateMachineRunnable, 10000) 
     }
-
-    private fun loadAssetsFiles() {
+      private fun loadAssetsFiles() {
         val assetManager: AssetManager = assets
         val allFiles = assetManager.list("webp") ?: return
         for (file in allFiles) {
@@ -185,7 +174,7 @@ class FloatingFishService : Service() {
                     }
                 }
             }
-handler.postDelayed(this, 10000) 
+            handler.postDelayed(this, 10000) 
         }
     }
 
@@ -255,53 +244,4 @@ handler.postDelayed(this, 10000)
                     params.y = screenHeight - floatingView.height
                     velocityY = -velocityY * bounceFactor
                     if (Math.abs(velocityY) < 20) velocityY = 0f 
-                    velocityX *= friction 
-                } else if (params.y <= 0) {
-                    params.y = 0
-                    velocityY = -velocityY * bounceFactor
-                }
-
-                windowManager.updateViewLayout(floatingView, params)
-            }
-            handler.postDelayed(this, 16)
-        }
-    }
-
-    private fun triggerClickInteraction() {
-        val currentTime = System.currentTimeMillis()
-        if (currentTime - lastClickTime < 1000) {
-            clickCount++
-        } else {
-            clickCount = 1
-        }
-        lastClickTime = currentTime
-
-        if (clickCount >= 5) {
-            showDialogue("哎呀！少爷你点疼我了！")
-            playRandomAnimation(clickList)
-            velocityY = -40f
-            clickCount = 0
-        } else {
-            playRandomAnimation(if (clickList.isNotEmpty()) clickList else idleList)
-            val line = clickLines[Random.nextInt(clickLines.size)]
-            showDialogue(line)
-        }
-    }
-
-    private fun showDialogue(text: String) {
-        tvDialogue.text = text
-        tvDialogue.visibility = View.VISIBLE
-        handler.removeCallbacks(hideDialogueRunnable)
-        handler.postDelayed(hideDialogueRunnable, 3500)
-    }
-
-    private val hideDialogueRunnable = Runnable { tvDialogue.visibility = View.GONE }
-
-    override fun onBind(intent: Intent?): IBinder? = null
-    
-    override fun onDestroy() {
-        super.onDestroy()
-        handler.removeCallbacksAndMessages(null)
-        if (floatingView.isAttachedToWindow) windowManager.removeView(floatingView)
-    }
-}
+                    velocityX *= fr
