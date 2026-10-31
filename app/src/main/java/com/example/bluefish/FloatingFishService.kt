@@ -44,16 +44,16 @@ class FloatingFishService : Service(), SensorEventListener {
     private var lastY = 0f
     private var lastZ = 0f
 
-    // 物理参数
+    // 物理参数（保持上一版的完美手感）
     private var velocityX = 0f
     private var velocityY = 0f
     private var isDragging = false
     private var gravityDirX = 0f
     private var gravityDirY = 1f
 
-    private val gravityBase = 0.25f // 适中的重力
-    private val airFriction = 0.985f // 适中的空气阻力
-    private val restitution = 0.75f // 适中的反弹系数
+    private val gravityBase = 0.25f
+    private val airFriction = 0.985f 
+    private val restitution = 0.75f 
     private val minBounceSpeedY = 1.0f
     
     private var screenWidth = 0
@@ -66,16 +66,39 @@ class FloatingFishService : Service(), SensorEventListener {
     private val playList = mutableListOf<String>()
     private val clickList = mutableListOf<String>()
 
+    // 🌟 超级生活化台词库
     private val clickLines = listOf(
-        "我亲爱的黎子少爷", "今天还爱我", "我好想你", 
+        // 专属情话
+        "我亲爱的黎子少爷", "今天还爱我吗", "我好想你呀", 
+        // 日常撒娇
         "少爷，你终于来看我啦！", "一直盯着你看，都不好意思了...", "最喜欢少爷摸我头了~",
         "黎子少爷今天也很帅气呢！", "只要能在少爷身边，大肥鱼就很开心了。", "少爷，你要去哪儿呀？带上我好不好？",
         "偷偷亲少爷一下，嘿嘿~", "今天也想和少爷贴贴！", "少爷，你摸摸我的心跳，好快呀。",
-        "哼，怎么现在才来找我？", "别拽我尾巴啦，要秃了！", "哎呀！你弄乱我的头发了！",
-        "少爷，你点得我头好晕呀...", "再戳我，大肥鱼可要生气了哦！", "笨蛋少爷，我才没有想你！",
-        "走开走开，我要睡觉啦。", "少爷，你是不是又忘记喂我了？", "不理你了，除非你拿小鱼干来哄我！"
+        "外面风好大，少爷快躲到我身后！", "少爷，我给你捶捶腿吧？", "想变成少爷口袋里的小鱼干，一直跟着你。",
+        // 日常生活与吐槽
+        "少爷，今天中午吃什么呀？我饿了...", "少爷，你昨晚是不是又熬夜了？黑眼圈都出来了！",
+        "我刚刚差点从屏幕上掉下去了，吓死我了！", "少爷，你的手机屏幕有点脏了，帮我擦擦呗~",
+        "今天天气真好，好想和少爷一起出去玩。", "如果少爷每天都能陪我玩就好了。",
+        "哎呀，少爷你点得太快啦，我都眼花了！", "少爷，你是不是又忘记喂我了？",
+        "我是大肥鱼，会吐泡泡的那种哦！", "别拽我尾巴啦，要秃了！", "哎呀！你弄乱我的头发了！",
+        "再戳我，大肥鱼可要生气了哦！", "哼，怎么现在才来找我？", "笨蛋少爷，我才没有想你！",
+        "走开走开，我要睡觉啦。", "不理你了，除非你拿小鱼干来哄我！",
+        "少爷，工作辛苦啦，休息一下吧。", "滴——电量不足，需要少爷的亲亲充电。",
+        "少爷，你看我新学的舞步好看吗？", "盯——(●'◡'●)", "不知道少爷的脑袋里在想什么呢？",
+        "少爷，别熬夜啦，快去睡觉！", "今天也是被黎子少爷迷倒的一天。",
+        "其实我有点怕黑，少爷别关灯。", "少爷，你今天有没有想我呀？", "如果你不开心，可以摸摸我哦。",
+        "少爷，你今天出门记得带伞哦！", "感觉今天水逆，少爷要小心一点呀。",
+        "好想变成人类，这样就可以牵着少爷的手了。", "少爷，你最喜欢我哪个表情呀？",
+        "少爷，我想吃冰淇淋...", "不要再摸啦，再摸头就要秃了！", "少爷，你在看什么好玩的呀？",
+        "今天的大肥鱼也是一级可爱！", "少爷，你为什么不说话？是不是嫌我烦了...",
+        "我才不是胖，我这是可爱到膨胀！", "少爷，你要不要听我唱歌？", 
+        "呼...差点睡着了...", "少爷，你是不是又背着我偷偷看别的桌宠了？"
     )
 
+    private val idleLines = listOf("好无聊呀...", "今天天气真好。", "少爷在忙什么呢？", "飘来飘去~")
+    private val sleepLines = listOf("呼...呼...", "Zzz...", "梦里也有少爷呢...")
+
+    private var currentState = "IDLE"
     private var lastClickTime = 0L
     private var clickCount = 0
 
@@ -89,7 +112,6 @@ class FloatingFishService : Service(), SensorEventListener {
         val prefs = getSharedPreferences("fish_prefs", MODE_PRIVATE)
         fishSize = prefs.getInt("fish_size", 800)
 
-        // 🌟 核心重构：使用 LinearLayout 垂直排列，让气泡有充足空间显示
         floatingView = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
@@ -97,7 +119,6 @@ class FloatingFishService : Service(), SensorEventListener {
             clipToPadding = false
         }
 
-        // 初始化气泡
         tvDialogue = TextView(this).apply {
             val bubbleBg = GradientDrawable().apply {
                 setColor(Color.parseColor("#E6192124"))
@@ -111,17 +132,14 @@ class FloatingFishService : Service(), SensorEventListener {
             visibility = View.INVISIBLE
             alpha = 0f 
             gravity = Gravity.CENTER
-            
-            // 限制最大宽度，强制换行，绝对不会少一半
             maxWidth = fishSize - 40 
             isSingleLine = false
         }
         floatingView.addView(tvDialogue)
 
-        // 初始化鱼
         maidFish = ImageView(this).apply {
             val lp = LinearLayout.LayoutParams(fishSize, fishSize)
-            lp.bottomMargin = -20 // 鱼和气泡稍微贴近一点
+            lp.bottomMargin = -20
             layoutParams = lp
             scaleType = ImageView.ScaleType.FIT_CENTER
         }
@@ -131,7 +149,6 @@ class FloatingFishService : Service(), SensorEventListener {
         screenWidth = displayMetrics.widthPixels
         screenHeight = displayMetrics.heightPixels
 
-        // 🌟 悬浮窗大小使用 WRAP_CONTENT，根据内容自适应
         params = WindowManager.LayoutParams(
             WindowManager.LayoutParams.WRAP_CONTENT,
             WindowManager.LayoutParams.WRAP_CONTENT,
@@ -149,7 +166,50 @@ class FloatingFishService : Service(), SensorEventListener {
         playRandomAnimation(idleList)
         setupTouchListener()
         
+        // 启动物理引擎
         handler.post(physicsRunnable)
+        // 🌟 启动 10 秒动作状态机
+        handler.postDelayed(stateMachineRunnable, 10000)
+    }
+
+    // 🌟 10秒自动动作切换状态机
+    private val stateMachineRunnable = object : Runnable {
+        override fun run() {
+            if (!isDragging) {
+                // 随机分配状态
+                val r = Random.nextInt(100)
+                currentState = when {
+                    r < 40 -> "IDLE"   
+                    r < 70 -> "WALK"  
+                    r < 90 -> "PLAY"  
+                    else -> "SLEEP"      
+                }
+                
+                when (currentState) {
+                    "IDLE" -> { 
+                        playRandomAnimation(idleList) 
+                    }
+                    "WALK" -> { 
+                        playRandomAnimation(walkList)
+                        // 给她一个轻微的横向速度，自己溜达
+                        velocityX = if (Random.nextBoolean()) Random.nextInt(3, 8).toFloat() else -Random.nextInt(3, 8).toFloat()
+                    }
+                    "PLAY" -> { 
+                        playRandomAnimation(playList)
+                        // 开心地小跳一下
+                        velocityY = -Random.nextInt(10, 20).toFloat()
+                    }
+                    "SLEEP" -> { 
+                        playRandomAnimation(sleepList)
+                        velocityX = 0f
+                        velocityY = 0f
+                        showDialogue(sleepLines[Random.nextInt(sleepLines.size)])
+                    }
+                }
+            }
+            // 每 10 秒循环一次
+            handler.postDelayed(this, 10000) 
+        }
     }
 
     override fun onSensorChanged(event: SensorEvent?) {
@@ -233,7 +293,7 @@ class FloatingFishService : Service(), SensorEventListener {
             override fun onTouch(v: View?, event: MotionEvent?): Boolean {
                 when (event?.action) {
                     MotionEvent.ACTION_DOWN -> {
-                        isDragging = true // 冻结物理引擎
+                        isDragging = true
                         initialX = params.x; initialY = params.y
                         initialTouchX = event.rawX; initialTouchY = event.rawY
                         lastTouchX = event.rawX; lastTouchY = event.rawY
@@ -242,11 +302,9 @@ class FloatingFishService : Service(), SensorEventListener {
                         return true
                     }
                     MotionEvent.ACTION_MOVE -> {
-                        // 🌟 丝滑跟手：直接计算位移，手指指哪打哪
                         val dx = (event.rawX - initialTouchX).toInt()
                         val dy = (event.rawY - initialTouchY).toInt()
                         
-                        // 边界限制：防止拖出屏幕外导致拖不动
                         params.x = (initialX + dx).coerceIn(0, screenWidth - floatingView.width)
                         params.y = (initialY + dy).coerceIn(0, screenHeight - floatingView.height)
                         
@@ -258,7 +316,7 @@ class FloatingFishService : Service(), SensorEventListener {
                         return true
                     }
                     MotionEvent.ACTION_UP -> {
-                        isDragging = false // 恢复物理引擎
+                        isDragging = false
                         if (System.currentTimeMillis() - downTime < 200 && abs(event.rawX - initialTouchX) < 10) {
                             triggerClickInteraction()
                         } else {
@@ -290,7 +348,6 @@ class FloatingFishService : Service(), SensorEventListener {
 
                 var hitEdge = false
 
-                // 左右碰壁
                 if (params.x <= 0) {
                     params.x = 0
                     velocityX = abs(velocityX) * restitution + 8f 
@@ -301,7 +358,6 @@ class FloatingFishService : Service(), SensorEventListener {
                     hitEdge = true
                 }
 
-                // 上下碰壁
                 if (params.y <= 0) {
                     params.y = 0
                     if (abs(velocityY) > minBounceSpeedY) {
