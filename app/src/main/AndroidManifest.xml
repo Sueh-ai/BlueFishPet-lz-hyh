@@ -6,6 +6,7 @@
 
     <application
         android:allowBackup="true"
+        android:icon="@drawable/ic_launcher_fish" 
         android:label="大肥鱼桌宠"
         android:theme="@style/Theme.AppCompat.Light.NoActionBar">
         
