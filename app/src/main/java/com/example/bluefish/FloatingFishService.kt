@@ -19,8 +19,8 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
 import android.view.animation.OvershootInterpolator
-import android.widget.FrameLayout
 import android.widget.ImageView
+import android.widget.LinearLayout
 import android.widget.TextView
 import com.bumptech.glide.Glide
 import kotlin.math.abs
@@ -29,33 +29,32 @@ import kotlin.random.Random
 
 class FloatingFishService : Service(), SensorEventListener {
     private lateinit var windowManager: WindowManager
-    private lateinit var floatingView: FrameLayout
+    private lateinit var floatingView: LinearLayout
     private lateinit var params: WindowManager.LayoutParams
     private lateinit var maidFish: ImageView
     private lateinit var tvDialogue: TextView
     private val handler = Handler(Looper.getMainLooper())
 
-    // 传感器与旋转防抖
+    // 传感器
     private lateinit var sensorManager: SensorManager
     private var currentRotation = 0f
-    private var lastAnimatedRotation = -1f 
+    private var lastAnimatedRotation = -1f
     private var lastShakeTime = 0L
     private var lastX = 0f
     private var lastY = 0f
     private var lastZ = 0f
 
-    // 物理参数（调教得更活泼）
+    // 物理参数
     private var velocityX = 0f
     private var velocityY = 0f
     private var isDragging = false
-    
     private var gravityDirX = 0f
     private var gravityDirY = 1f
-    
-    private val gravityBase = 0.35f // 稍微加大一点点下落重力
-    private val airFriction = 0.995f // 🌟 空气阻力大幅减小（原0.98），飞得更远
-    private val restitution = 0.9f   // 🌟 反弹能量保留 90%（原0.7），超级弹
-    private val minBounceSpeedY = 0.5f // 降低停止阈值，让她更晚停下
+
+    private val gravityBase = 0.25f // 适中的重力
+    private val airFriction = 0.985f // 适中的空气阻力
+    private val restitution = 0.75f // 适中的反弹系数
+    private val minBounceSpeedY = 1.0f
     
     private var screenWidth = 0
     private var screenHeight = 0
@@ -67,23 +66,14 @@ class FloatingFishService : Service(), SensorEventListener {
     private val playList = mutableListOf<String>()
     private val clickList = mutableListOf<String>()
 
-    // 🌟 超丰富台词库（30多句，再也不会重复了）
     private val clickLines = listOf(
-        // 专属核心
         "我亲爱的黎子少爷", "今天还爱我", "我好想你", 
-        // 撒娇
         "少爷，你终于来看我啦！", "一直盯着你看，都不好意思了...", "最喜欢少爷摸我头了~",
         "黎子少爷今天也很帅气呢！", "只要能在少爷身边，大肥鱼就很开心了。", "少爷，你要去哪儿呀？带上我好不好？",
         "偷偷亲少爷一下，嘿嘿~", "今天也想和少爷贴贴！", "少爷，你摸摸我的心跳，好快呀。",
-        // 傲娇
         "哼，怎么现在才来找我？", "别拽我尾巴啦，要秃了！", "哎呀！你弄乱我的头发了！",
         "少爷，你点得我头好晕呀...", "再戳我，大肥鱼可要生气了哦！", "笨蛋少爷，我才没有想你！",
-        "走开走开，我要睡觉啦。", "少爷，你是不是又忘记喂我了？", "不理你了，除非你拿小鱼干来哄我！",
-        // 日常
-        "我是大肥鱼，会吐泡泡的那种哦！", "少爷，今天中午吃什么呀？", "救命，我卡在屏幕边缘了！",
-        "如果少爷每天都能陪我玩就好了。", "我是不是全宇宙最可爱的女仆？", "滴——电量不足，需要少爷的亲亲充电。",
-        "少爷，你看我新学的舞步好看吗？", "盯——(●'◡'●)", "不知道少爷的脑袋里在想什么呢？",
-        "少爷，别熬夜啦，快去睡觉！", "今天也是被黎子少爷迷倒的一天。", "其实我有点怕黑，少爷别关灯。"
+        "走开走开，我要睡觉啦。", "少爷，你是不是又忘记喂我了？", "不理你了，除非你拿小鱼干来哄我！"
     )
 
     private var lastClickTime = 0L
@@ -99,45 +89,52 @@ class FloatingFishService : Service(), SensorEventListener {
         val prefs = getSharedPreferences("fish_prefs", MODE_PRIVATE)
         fishSize = prefs.getInt("fish_size", 800)
 
-        floatingView = FrameLayout(this)
+        // 🌟 核心重构：使用 LinearLayout 垂直排列，让气泡有充足空间显示
+        floatingView = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_HORIZONTAL
+            clipChildren = false
+            clipToPadding = false
+        }
 
+        // 初始化气泡
+        tvDialogue = TextView(this).apply {
+            val bubbleBg = GradientDrawable().apply {
+                setColor(Color.parseColor("#E6192124"))
+                cornerRadius = 30f
+                setStroke(2, Color.parseColor("#3A3A3A"))
+            }
+            background = bubbleBg
+            setTextColor(Color.WHITE)
+            textSize = 14f
+            setPadding(30, 20, 30, 20)
+            visibility = View.INVISIBLE
+            alpha = 0f 
+            gravity = Gravity.CENTER
+            
+            // 限制最大宽度，强制换行，绝对不会少一半
+            maxWidth = fishSize - 40 
+            isSingleLine = false
+        }
+        floatingView.addView(tvDialogue)
+
+        // 初始化鱼
         maidFish = ImageView(this).apply {
-            val lp = FrameLayout.LayoutParams(fishSize, fishSize)
+            val lp = LinearLayout.LayoutParams(fishSize, fishSize)
+            lp.bottomMargin = -20 // 鱼和气泡稍微贴近一点
             layoutParams = lp
             scaleType = ImageView.ScaleType.FIT_CENTER
         }
         floatingView.addView(maidFish)
 
-        tvDialogue = TextView(this).apply {
-    val bubbleBg = GradientDrawable().apply {
-        setColor(Color.parseColor("#E6192124"))
-        cornerRadius = 30f
-        setStroke(2, Color.parseColor("#3A3A3A"))
-    }
-    background = bubbleBg
-    setTextColor(Color.WHITE)
-    textSize = 14f
-    setPadding(30, 20, 30, 20)
-    visibility = View.INVISIBLE
-    alpha = 0f 
-    gravity = Gravity.CENTER // 文字居中对齐
-}
-// 🌟 核心修复：强制把气泡的宽度限制在和大肥鱼一样宽，超出部分自动换行！
-val tvLp = FrameLayout.LayoutParams(
-    fishSize - 20, // 宽度比鱼稍微小一点点，留点边距
-    FrameLayout.LayoutParams.WRAP_CONTENT // 高度自适应
-)
-tvLp.gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
-tvLp.topMargin = -60 // 把气泡稍微往上顶一点
-tvDialogue.layoutParams = tvLp
-floatingView.addView(tvDialogue)
-
         val displayMetrics = resources.displayMetrics
         screenWidth = displayMetrics.widthPixels
         screenHeight = displayMetrics.heightPixels
 
+        // 🌟 悬浮窗大小使用 WRAP_CONTENT，根据内容自适应
         params = WindowManager.LayoutParams(
-            fishSize, fishSize,
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            WindowManager.LayoutParams.WRAP_CONTENT,
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY else WindowManager.LayoutParams.TYPE_PHONE,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
             PixelFormat.TRANSLUCENT
@@ -187,7 +184,6 @@ floatingView.addView(tvDialogue)
                 val deltaZ = abs(z - lastZ)
                 val speed = sqrt((deltaX * deltaX + deltaY * deltaY + deltaZ * deltaZ).toDouble()).toFloat()
 
-                // 🌟 摇晃阈值降低到 10f，轻微晃一下就能弹
                 if (speed > 10f && !isDragging) { 
                     lastShakeTime = currentTime
                     handler.post {
@@ -237,7 +233,7 @@ floatingView.addView(tvDialogue)
             override fun onTouch(v: View?, event: MotionEvent?): Boolean {
                 when (event?.action) {
                     MotionEvent.ACTION_DOWN -> {
-                        isDragging = true
+                        isDragging = true // 冻结物理引擎
                         initialX = params.x; initialY = params.y
                         initialTouchX = event.rawX; initialTouchY = event.rawY
                         lastTouchX = event.rawX; lastTouchY = event.rawY
@@ -246,8 +242,14 @@ floatingView.addView(tvDialogue)
                         return true
                     }
                     MotionEvent.ACTION_MOVE -> {
-                        params.x = initialX + (event.rawX - initialTouchX).toInt()
-                        params.y = initialY + (event.rawY - initialTouchY).toInt()
+                        // 🌟 丝滑跟手：直接计算位移，手指指哪打哪
+                        val dx = (event.rawX - initialTouchX).toInt()
+                        val dy = (event.rawY - initialTouchY).toInt()
+                        
+                        // 边界限制：防止拖出屏幕外导致拖不动
+                        params.x = (initialX + dx).coerceIn(0, screenWidth - floatingView.width)
+                        params.y = (initialY + dy).coerceIn(0, screenHeight - floatingView.height)
+                        
                         windowManager.updateViewLayout(floatingView, params)
                         
                         velocityX = (event.rawX - lastTouchX) * 0.8f
@@ -256,7 +258,7 @@ floatingView.addView(tvDialogue)
                         return true
                     }
                     MotionEvent.ACTION_UP -> {
-                        isDragging = false
+                        isDragging = false // 恢复物理引擎
                         if (System.currentTimeMillis() - downTime < 200 && abs(event.rawX - initialTouchX) < 10) {
                             triggerClickInteraction()
                         } else {
@@ -288,19 +290,18 @@ floatingView.addView(tvDialogue)
 
                 var hitEdge = false
 
-                // 🌟 左右碰撞：保底弹射初速度加大到 6f，轻轻碰到就弹回去
+                // 左右碰壁
                 if (params.x <= 0) {
                     params.x = 0
-                    // 🌟 基础弹力从 6f 提升到 15f，保证每次撞墙都像弹力球一样弹飞
-                    velocityX = abs(velocityX) * restitution + 15f 
+                    velocityX = abs(velocityX) * restitution + 8f 
                     hitEdge = true
-                } else if (params.x + fishSize >= screenWidth) {
-                    params.x = screenWidth - fishSize
-                    velocityX = -(abs(velocityX) * restitution + 15f)
+                } else if (params.x + floatingView.width >= screenWidth) {
+                    params.x = screenWidth - floatingView.width
+                    velocityX = -(abs(velocityX) * restitution + 8f)
                     hitEdge = true
                 }
 
-                // 上下碰撞
+                // 上下碰壁
                 if (params.y <= 0) {
                     params.y = 0
                     if (abs(velocityY) > minBounceSpeedY) {
@@ -309,8 +310,8 @@ floatingView.addView(tvDialogue)
                     } else {
                         velocityY = 0f
                     }
-                } else if (params.y + fishSize >= screenHeight) {
-                    params.y = screenHeight - fishSize
+                } else if (params.y + floatingView.height >= screenHeight) {
+                    params.y = screenHeight - floatingView.height
                     if (abs(velocityY) > minBounceSpeedY) {
                         velocityY = -abs(velocityY) * restitution
                         hitEdge = true
@@ -329,7 +330,6 @@ floatingView.addView(tvDialogue)
         }
     }
 
-    // 极致Q弹形变
     private fun jellySquash() {
         maidFish.animate().cancel()
         maidFish.scaleX = 1.25f
