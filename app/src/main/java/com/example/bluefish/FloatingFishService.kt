@@ -318,10 +318,17 @@ class FloatingFishService : Service(), SensorEventListener {
     }
 
     private fun jellySquash() {
-        maidFish.animate().cancel()
-        maidFish.scaleX = 1.1f
-        maidFish.scaleY = 0.9f
-        maidFish.animate().scaleX(1f).scaleY(1f).setInterpolator(OvershootInterpolator(2f)).setDuration(200).start()
+    maidFish.animate().cancel()
+    // 形变幅度加大：横向拉伸到 1.25，纵向压扁到 0.75
+    maidFish.scaleX = 1.25f
+    maidFish.scaleY = 0.75f
+    // 回弹时间延长到 350ms，并且使用 OvershootInterpolator(3.5f) 产生果冻颤动
+    maidFish.animate()
+        .scaleX(1f)
+        .scaleY(1f)
+        .setInterpolator(android.view.animation.OvershootInterpolator(3.5f)) 
+        .setDuration(350)
+        .start()
     }
 
     private fun triggerClickInteraction() {
