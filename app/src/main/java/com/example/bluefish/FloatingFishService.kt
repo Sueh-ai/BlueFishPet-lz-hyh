@@ -35,15 +35,16 @@ class FloatingFishService : Service(), SensorEventListener {
     private lateinit var tvDialogue: TextView
     private val handler = Handler(Looper.getMainLooper())
 
-    // 🌟 传感器
+    // 🌟 传感器与旋转防抖
     private lateinit var sensorManager: SensorManager
     private var currentRotation = 0f
+    private var lastAnimatedRotation = -1f // 记录上一次动画的角度
     private var lastShakeTime = 0L
     private var lastX = 0f
     private var lastY = 0f
     private var lastZ = 0f
 
-    // 物理参数（轻盈带阻尼版）
+    // 物理参数
     private var velocityX = 0f
     private var velocityY = 0f
     private var isDragging = false
@@ -51,10 +52,10 @@ class FloatingFishService : Service(), SensorEventListener {
     private var gravityDirX = 0f
     private var gravityDirY = 1f
     
-    private val gravityBase = 0.15f // 适中的重力，缓缓飘落
-    private val airFriction = 0.98f // 空气阻力
-    private val restitution = 0.6f  // 🌟 阻尼反弹系数（每次碰撞损失40%能量）
-    private val minBounceSpeed = 1.5f // 🌟 低于这个速度就不弹了，直接停下（防抽搐核心）
+    private val gravityBase = 0.15f 
+    private val airFriction = 0.98f 
+    private val restitution = 0.6f  
+    private val minBounceSpeedY = 1.5f // 上下弹跳的最低速度阈值
     
     private var screenWidth = 0
     private var screenHeight = 0
@@ -140,7 +141,7 @@ class FloatingFishService : Service(), SensorEventListener {
         handler.post(physicsRunnable)
     }
 
-    override fun onSensorChanged(event: SensorEvent?) {
+     override fun onSensorChanged(event: SensorEvent?) {
         if (event?.sensor?.type == Sensor.TYPE_ACCELEROMETER) {
             val x = event.values[0]
             val y = event.values[1]
@@ -161,8 +162,10 @@ class FloatingFishService : Service(), SensorEventListener {
                 }
             }
             
-            if (maidFish.rotation != currentRotation) {
-                maidFish.animate().rotation(currentRotation).setDuration(300).start()
+            // 🌟 修复卡顿：只有当前角度和“已经执行过的角度”不一样时，才触发动画
+            if (currentRotation != lastAnimatedRotation) {
+                maidFish.animate().rotation(currentRotation).setDuration(400).start()
+                lastAnimatedRotation = currentRotation // 记录，防止同个方向频繁触发
             }
 
             // 摇晃检测
@@ -256,19 +259,15 @@ class FloatingFishService : Service(), SensorEventListener {
         })
     }
 
-    // 🌟 阻尼衰减反弹物理引擎
     private val physicsRunnable = object : Runnable {
         override fun run() {
             if (!isDragging) {
-                // 施加重力
                 velocityX += gravityDirX * gravityBase
                 velocityY += gravityDirY * gravityBase
                 
-                // 空气阻力
                 velocityX *= airFriction
                 velocityY *= airFriction
 
-                // 如果速度极小，直接归零（防止肉眼看不见的抽搐）
                 if (abs(velocityX) < 0.05f) velocityX = 0f
                 if (abs(velocityY) < 0.05f) velocityY = 0f
 
@@ -276,51 +275,38 @@ class FloatingFishService : Service(), SensorEventListener {
                 params.y += velocityY.toInt()
 
                 var hitEdge = false
-                var impactSpeed = 0f
 
-                // 左右碰撞（带阻尼衰减）
+                // 🌟 左右碰撞：强制弹射，绝不贴墙
                 if (params.x <= 0) {
                     params.x = 0
-                    impactSpeed = abs(velocityX)
-                    if (impactSpeed > minBounceSpeed) {
-                        velocityX = impactSpeed * restitution // 反弹，但能量衰减
-                        hitEdge = true
-                    } else {
-                        velocityX = 0f // 速度太慢，直接停住
-                    }
+                    // 如果本来是在往左走（或者被重力拉着），强制给它一个向右的初速度
+                    velocityX = abs(velocityX) * restitution + 4f 
+                    hitEdge = true
                 } else if (params.x + fishSize >= screenWidth) {
                     params.x = screenWidth - fishSize
-                    impactSpeed = abs(velocityX)
-                    if (impactSpeed > minBounceSpeed) {
-                        velocityX = -impactSpeed * restitution
-                        hitEdge = true
-                    } else {
-                        velocityX = 0f
-                    }
+                    velocityX = -(abs(velocityX) * restitution + 4f)
+                    hitEdge = true
                 }
 
-                // 上下碰撞（带阻尼衰减）
+                // 上下碰撞：保留低速停靠（防底边抽搐）
                 if (params.y <= 0) {
                     params.y = 0
-                    impactSpeed = abs(velocityY)
-                    if (impactSpeed > minBounceSpeed) {
-                        velocityY = impactSpeed * restitution
+                    if (abs(velocityY) > minBounceSpeedY) {
+                        velocityY = abs(velocityY) * restitution
                         hitEdge = true
                     } else {
                         velocityY = 0f
                     }
                 } else if (params.y + fishSize >= screenHeight) {
                     params.y = screenHeight - fishSize
-                    impactSpeed = abs(velocityY)
-                    if (impactSpeed > minBounceSpeed) {
-                        velocityY = -impactSpeed * restitution
+                    if (abs(velocityY) > minBounceSpeedY) {
+                        velocityY = -abs(velocityY) * restitution
                         hitEdge = true
                     } else {
                         velocityY = 0f
                     }
                 }
 
-                // 只有撞击速度够快时，才触发Q弹形变
                 if (hitEdge) {
                     jellySquash()
                 }
