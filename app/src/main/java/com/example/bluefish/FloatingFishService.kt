@@ -133,4 +133,4 @@ class FloatingFishService : Service() {
                     "SLEEP" -> { 
                         playRandomAnimation(sleepList)
                         velocityX = 0f
-     
+                    }              }              }
