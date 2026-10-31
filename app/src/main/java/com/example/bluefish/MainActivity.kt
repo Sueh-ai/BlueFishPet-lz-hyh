@@ -17,7 +17,6 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // 深色渐变背景
         val bgDrawable = GradientDrawable(
             GradientDrawable.Orientation.TL_BR,
             intArrayOf(Color.parseColor("#1A1B21"), Color.parseColor("#2D2F3B"))
@@ -34,12 +33,11 @@ class MainActivity : AppCompatActivity() {
             text = "黎子少爷的专属大肥鱼"
             textSize = 24f
             setTextColor(Color.WHITE)
-            setShadowLayer(10f, 0f, 0f, Color.parseColor("#80FFFFFF")) // 发光效果
         }
         layout.addView(tvTitle)
 
         val tvSubtitle = TextView(this).apply {
-            text = "\n设置她的大小，然后召唤到桌面吧！\n"
+            text = "\n摇晃手机，她会四处乱弹哦！\n设置大小后召唤：\n"
             textSize = 14f
             setTextColor(Color.parseColor("#AAAAAA"))
         }
@@ -48,12 +46,11 @@ class MainActivity : AppCompatActivity() {
         val tvSizeShow = TextView(this).apply {
             text = "当前大小: 600"
             textSize = 18f
-            setTextColor(Color.parseColor("#FFD700")) // 金黄色
+            setTextColor(Color.parseColor("#FFD700"))
             setPadding(0, 30, 0, 30)
         }
         layout.addView(tvSizeShow)
 
-        // 美化滑动条（去掉系统默认背景）
         val seekBar = SeekBar(this).apply {
             max = 1000
             progress = 600
@@ -68,7 +65,7 @@ class MainActivity : AppCompatActivity() {
             setTextColor(Color.BLACK)
             val btnBg = GradientDrawable().apply {
                 setColor(Color.parseColor("#FFD700"))
-                cornerRadius = 50f // 圆角按钮
+                cornerRadius = 50f
             }
             background = btnBg
             val lp = LinearLayout.LayoutParams(
@@ -95,7 +92,6 @@ class MainActivity : AppCompatActivity() {
             getSharedPreferences("fish_prefs", MODE_PRIVATE).edit()
                 .putInt("fish_size", finalSize).apply()
 
-            // 检查悬浮窗权限并启动
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                 if (!Settings.canDrawOverlays(this)) {
                     val intent = Intent(
