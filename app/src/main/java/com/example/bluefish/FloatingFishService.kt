@@ -44,7 +44,7 @@ class FloatingFishService : Service(), SensorEventListener {
     private var lastY = 0f
     private var lastZ = 0f
 
-    // 物理参数（保持上一版的完美手感）
+    // 物理参数
     private var velocityX = 0f
     private var velocityY = 0f
     private var isDragging = false
@@ -66,16 +66,12 @@ class FloatingFishService : Service(), SensorEventListener {
     private val playList = mutableListOf<String>()
     private val clickList = mutableListOf<String>()
 
-    // 🌟 超级生活化台词库
     private val clickLines = listOf(
-        // 专属情话
         "我亲爱的黎子少爷", "今天还爱我吗", "我好想你呀", 
-        // 日常撒娇
         "少爷，你终于来看我啦！", "一直盯着你看，都不好意思了...", "最喜欢少爷摸我头了~",
         "黎子少爷今天也很帅气呢！", "只要能在少爷身边，大肥鱼就很开心了。", "少爷，你要去哪儿呀？带上我好不好？",
         "偷偷亲少爷一下，嘿嘿~", "今天也想和少爷贴贴！", "少爷，你摸摸我的心跳，好快呀。",
         "外面风好大，少爷快躲到我身后！", "少爷，我给你捶捶腿吧？", "想变成少爷口袋里的小鱼干，一直跟着你。",
-        // 日常生活与吐槽
         "少爷，今天中午吃什么呀？我饿了...", "少爷，你昨晚是不是又熬夜了？黑眼圈都出来了！",
         "我刚刚差点从屏幕上掉下去了，吓死我了！", "少爷，你的手机屏幕有点脏了，帮我擦擦呗~",
         "今天天气真好，好想和少爷一起出去玩。", "如果少爷每天都能陪我玩就好了。",
@@ -92,7 +88,7 @@ class FloatingFishService : Service(), SensorEventListener {
         "少爷，我想吃冰淇淋...", "不要再摸啦，再摸头就要秃了！", "少爷，你在看什么好玩的呀？",
         "今天的大肥鱼也是一级可爱！", "少爷，你为什么不说话？是不是嫌我烦了...",
         "我才不是胖，我这是可爱到膨胀！", "少爷，你要不要听我唱歌？", 
-        "呼...差点睡着了...", "少爷，你是不是又背着我偷偷看别的桌宠了？"
+        "呼...差点睡着了...", "少爷，你是不是又背着我看别的桌宠了？"
     )
 
     private val idleLines = listOf("好无聊呀...", "今天天气真好。", "少爷在忙什么呢？", "飘来飘去~")
@@ -166,22 +162,20 @@ class FloatingFishService : Service(), SensorEventListener {
         playRandomAnimation(idleList)
         setupTouchListener()
         
-        // 启动物理引擎
         handler.post(physicsRunnable)
-        // 🌟 启动 10 秒动作状态机
-        handler.postDelayed(stateMachineRunnable, 10000)
+        // 🌟 启动 20 秒动作状态机
+        handler.postDelayed(stateMachineRunnable, 20000)
     }
 
-    // 🌟 10秒自动动作切换状态机
+    // 🌟 20秒自动动作切换状态机
     private val stateMachineRunnable = object : Runnable {
         override fun run() {
             if (!isDragging) {
-                // 随机分配状态
                 val r = Random.nextInt(100)
                 currentState = when {
-                    r < 40 -> "IDLE"   
-                    r < 70 -> "WALK"  
-                    r < 90 -> "PLAY"  
+                    r < 30 -> "IDLE"   // 降低发呆概率
+                    r < 60 -> "WALK"   // 增加漫步概率
+                    r < 90 -> "PLAY"   // 增加玩耍概率
                     else -> "SLEEP"      
                 }
                 
@@ -191,13 +185,18 @@ class FloatingFishService : Service(), SensorEventListener {
                     }
                     "WALK" -> { 
                         playRandomAnimation(walkList)
-                        // 给她一个轻微的横向速度，自己溜达
-                        velocityX = if (Random.nextBoolean()) Random.nextInt(3, 8).toFloat() else -Random.nextInt(3, 8).toFloat()
+                        // 🌟 增加到处跑的动力：给一个较大的横向速度
+                        velocityX = if (Random.nextBoolean()) Random.nextInt(10, 18).toFloat() else -Random.nextInt(10, 18).toFloat()
+                        // 如果她在底部或者顶部卡住了，给个跳跃力
+                        if (abs(velocityY) < 2f) {
+                            velocityY = -gravityDirY * Random.nextInt(10, 15)
+                        }
                     }
                     "PLAY" -> { 
                         playRandomAnimation(playList)
-                        // 开心地小跳一下
-                        velocityY = -Random.nextInt(10, 20).toFloat()
+                        // 🌟 开心地跳跃并且横向飞
+                        velocityY = -gravityDirY * Random.nextInt(15, 25).toFloat()
+                        velocityX = Random.nextInt(-20, 20).toFloat()
                     }
                     "SLEEP" -> { 
                         playRandomAnimation(sleepList)
@@ -207,8 +206,8 @@ class FloatingFishService : Service(), SensorEventListener {
                     }
                 }
             }
-            // 每 10 秒循环一次
-            handler.postDelayed(this, 10000) 
+            // 🌟 时间改为 20 秒循环
+            handler.postDelayed(this, 20000) 
         }
     }
 
