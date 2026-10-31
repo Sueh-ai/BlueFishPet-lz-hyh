@@ -120,21 +120,17 @@ class FloatingFishService : Service(), SensorEventListener {
     setPadding(30, 20, 30, 20)
     visibility = View.INVISIBLE
     alpha = 0f 
-    gravity = Gravity.CENTER
-    
-    // 🌟 核心修复：限制最大宽度，并允许文字换行
-    // 使用 resources.displayMetrics 提前获取屏幕宽度，不依赖外面的变量
-    maxWidth = (resources.displayMetrics.widthPixels * 0.75).toInt()
-    isSingleLine = false
-        }
-        val tvLp = FrameLayout.LayoutParams(
-            FrameLayout.LayoutParams.WRAP_CONTENT,
-            FrameLayout.LayoutParams.WRAP_CONTENT
-        )
-        tvLp.gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
-        tvLp.topMargin = -50
-        tvDialogue.layoutParams = tvLp
-        floatingView.addView(tvDialogue)
+    gravity = Gravity.CENTER // 文字居中对齐
+}
+// 🌟 核心修复：强制把气泡的宽度限制在和大肥鱼一样宽，超出部分自动换行！
+val tvLp = FrameLayout.LayoutParams(
+    fishSize - 20, // 宽度比鱼稍微小一点点，留点边距
+    FrameLayout.LayoutParams.WRAP_CONTENT // 高度自适应
+)
+tvLp.gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
+tvLp.topMargin = -60 // 把气泡稍微往上顶一点
+tvDialogue.layoutParams = tvLp
+floatingView.addView(tvDialogue)
 
         val displayMetrics = resources.displayMetrics
         screenWidth = displayMetrics.widthPixels
