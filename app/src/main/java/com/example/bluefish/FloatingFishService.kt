@@ -37,21 +37,21 @@ class FloatingFishService : Service(), SensorEventListener {
     // 🌟 传感器相关
     private lateinit var sensorManager: SensorManager
     private var accelerometer: Sensor? = null
-    private var sensorX = 0f // 手机左右倾斜的重力
-    private var sensorY = 0f // 手机上下倾斜的重力
+    private var sensorX = 0f 
+    private var sensorY = 0f 
     
     private var lastShakeTime = 0L
     private var lastX = 0f
     private var lastY = 0f
     private var lastZ = 0f
 
-    // 物理参数 (轻盈版)
+    // 物理参数 (绝对轻盈版)
     private var velocityX = 0f
     private var velocityY = 0f
     private var isDragging = false
-    private var gravityBase = 2.5f // 🌟 基础重力极小，像气球一样轻盈
-    private var bounceFactor = -0.85f // 🌟 弹力超强
-    private var friction = 0.99f // 几乎无摩擦，能在屏幕上滑很远
+    private var gravityBase = 0.3f // 🌟 重力几乎为 0，像太空中漂浮的气球，不会总落底
+    private var bounceFactor = -0.98f // 🌟 弹力拉满，撞击几乎不损失能量
+    private var friction = 1.0f // 🌟 无摩擦，在屏幕上滑翔得极远
     private var screenWidth = 0
     private var screenHeight = 0
 
@@ -61,7 +61,6 @@ class FloatingFishService : Service(), SensorEventListener {
     private val playList = mutableListOf<String>()
     private val clickList = mutableListOf<String>()
 
-    // 🌟 台词库全面扩充
     private val clickLines = listOf(
         "我亲爱的黎子少爷", "今天还爱我", "我好想你", 
         "少爷，你终于来看我啦！", "一直盯着你看，都不好意思了...", "最喜欢少爷摸我头了~",
@@ -72,8 +71,8 @@ class FloatingFishService : Service(), SensorEventListener {
         "笨蛋少爷，我才没有想你！", "走开走开，我要睡觉啦。", "少爷，你是不是又忘记喂我了？",
         "不理你了，除非你拿小鱼干来哄我！", "大肥鱼也是有脾气的！", "我是大肥鱼，会吐泡泡的那种哦！"
     )
-    private val shakeLines = listOf("哎呀！地震了吗？", "晃得我头晕眼花...", "少爷别摇啦！", "救命呀！我要飞出去了！", "哇哦——飞高高！")
-    private val idleLines = listOf("好无聊呀...", "今天天气真好。", "少爷在忙什么呢？", "肚子好像有点饿了...", "想出去玩~")
+    private val shakeLines = listOf("哎呀！地震了吗？", "晃得我头晕眼花...", "少爷别摇啦！", "救命呀！我要飞出去了！", "哇哦——飞高高！", "晕了晕了，别晃啦~")
+    private val idleLines = listOf("好无聊呀...", "今天天气真好。", "少爷在忙什么呢？", "肚子好像有点饿了...", "想出去玩~", "飘来飘去的感觉真好！")
     private val sleepLines = listOf("呼...呼...", "Zzz...", "梦里也有少爷呢...", "别吵，我在睡觉...")
 
     private var currentState = "IDLE"
@@ -84,7 +83,6 @@ class FloatingFishService : Service(), SensorEventListener {
         super.onCreate()
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
         
-        // 注册加速度传感器（同时用于检测倾斜和摇晃）
         sensorManager = getSystemService(SENSOR_SERVICE) as SensorManager
         accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
         accelerometer?.let {
@@ -153,38 +151,35 @@ class FloatingFishService : Service(), SensorEventListener {
         
         handler.post(physicsRunnable)
         handler.postDelayed(stateMachineRunnable, 5000)
-        handler.postDelayed(autoChatRunnable, 15000) // 15秒自动说一次话
+        handler.postDelayed(autoChatRunnable, 15000) 
     }
 
-    // 🌟 核心：同时处理“倾斜重力”和“摇晃检测”
+    // 🌟 传感器：极高灵敏度
     override fun onSensorChanged(event: SensorEvent?) {
         if (event?.sensor?.type == Sensor.TYPE_ACCELEROMETER) {
             val x = event.values[0]
             val y = event.values[1]
             val z = event.values[2]
 
-            // 1. 倾斜重力：手机往哪边歪，她就往哪边滚
-            // 乘以一个系数调整重力感应的灵敏度
-            sensorX = -x * 1.5f 
-            sensorY = y * 1.5f
+            // 放大倾斜影响，稍微歪一点手机她就飘走
+            sensorX = -x * 2.0f 
+            sensorY = y * 2.0f
 
-            // 2. 摇晃检测：加速度突变时弹跳
             val currentTime = System.currentTimeMillis()
-            if ((currentTime - lastShakeTime) > 500) {
+            if ((currentTime - lastShakeTime) > 400) {
                 val deltaX = abs(x - lastX)
                 val deltaY = abs(y - lastY)
                 val deltaZ = abs(z - lastZ)
                 val speed = sqrt((deltaX * deltaX + deltaY * deltaY + deltaZ * deltaZ).toDouble()).toFloat()
 
-                // 阈值调低到 12f，稍微晃一下就能感应到
-                if (speed > 12f && !isDragging) {
+                if (speed > 10f && !isDragging) {
                     lastShakeTime = currentTime
                     handler.post {
                         playRandomAnimation(playList)
                         showDialogue(shakeLines[Random.nextInt(shakeLines.size)])
-                        // 给一个随机的猛力弹跳
-                        velocityY = -Random.nextInt(20, 35).toFloat()
-                        velocityX = Random.nextInt(-20, 20).toFloat()
+                        // 摇晃时给一个极大的初速度，让她乱撞
+                        velocityY = -Random.nextInt(25, 45).toFloat()
+                        velocityX = Random.nextInt(-30, 30).toFloat()
                     }
                 }
             }
@@ -215,32 +210,31 @@ class FloatingFishService : Service(), SensorEventListener {
         }
     }
 
-    // 自动状态机
     private val stateMachineRunnable = object : Runnable {
         override fun run() {
             if (!isDragging) {
                 currentState = when (Random.nextInt(100)) {
                     in 0..30 -> "IDLE"   
                     in 31..60 -> "WALK"  
-                    in 61..85 -> "PLAY"  // 增加自己弹跳的概率
+                    in 61..85 -> "PLAY"  
                     else -> "SLEEP"      
                 }
                 when (currentState) {
                     "IDLE" -> { playRandomAnimation(idleList) }
                     "WALK" -> { 
                         playRandomAnimation(walkList)
-                        // 给她一个自己溜达的速度
-                        velocityX += if (Random.nextBoolean()) Random.nextInt(5, 10).toFloat() else -Random.nextInt(5, 10).toFloat()
+                        velocityX += if (Random.nextBoolean()) Random.nextInt(10, 20).toFloat() else -Random.nextInt(10, 20).toFloat()
                     }
                     "PLAY" -> { 
                         playRandomAnimation(playList)
-                        // 自己到处乱蹦
-                        velocityY = -Random.nextInt(15, 30).toFloat()
-                        velocityX = Random.nextInt(-15, 15).toFloat()
+                        // 自己蹦跳，打破平衡
+                        velocityY = -Random.nextInt(20, 35).toFloat()
+                        velocityX = Random.nextInt(-20, 20).toFloat()
                     }
                     "SLEEP" -> { 
                         playRandomAnimation(sleepList)
                         velocityX = 0f
+                        velocityY = 0f
                         showDialogue(sleepLines[Random.nextInt(sleepLines.size)])
                     }
                 }
@@ -249,13 +243,12 @@ class FloatingFishService : Service(), SensorEventListener {
         }
     }
 
-    // 🌟 自动自言自语
     private val autoChatRunnable = object : Runnable {
         override fun run() {
             if (!isDragging && tvDialogue.visibility != View.VISIBLE && currentState == "IDLE") {
                 showDialogue(idleLines[Random.nextInt(idleLines.size)])
             }
-            handler.postDelayed(this, Random.nextLong(15000, 30000)) // 15到30秒随机说一次
+            handler.postDelayed(this, Random.nextLong(15000, 30000)) 
         }
     }
 
@@ -295,9 +288,9 @@ class FloatingFishService : Service(), SensorEventListener {
                         if (System.currentTimeMillis() - downTime < 200 && abs(event.rawX - initialTouchX) < 10) {
                             triggerClickInteraction()
                         } else {
-                            // 甩飞惯性：乘 2.5 让她飞得更远
-                            velocityX = (event.rawX - lastTouchX) * 2.5f
-                            velocityY = (event.rawY - lastTouchY) * 2.5f
+                            // 甩飞乘 3.0，直接变成流星
+                            velocityX = (event.rawX - lastTouchX) * 3.0f
+                            velocityY = (event.rawY - lastTouchY) * 3.0f
                         }
                         return true
                     }
@@ -307,16 +300,16 @@ class FloatingFishService : Service(), SensorEventListener {
         })
     }
 
-    // 🌟 轻盈的物理引擎
+    // 🌟 极致悬浮物理引擎
     private val physicsRunnable = object : Runnable {
         override fun run() {
             if (!isDragging) {
-                // 融合手机倾斜的重力 (sensorX, sensorY) 和基础向下重力
+                // 加上极其微弱的向下重力，以及手机倾斜的重力
                 velocityX += sensorX
                 velocityY += sensorY + gravityBase
                 
-                // 限制最大速度，防止手机猛晃时飞出屏幕
-                val maxSpeed = 40f
+                // 速度上限稍微放开，允许她飞得更狂野
+                val maxSpeed = 50f
                 if (velocityX > maxSpeed) velocityX = maxSpeed
                 if (velocityX < -maxSpeed) velocityX = -maxSpeed
                 if (velocityY > maxSpeed) velocityY = maxSpeed
@@ -325,30 +318,29 @@ class FloatingFishService : Service(), SensorEventListener {
                 params.x += velocityX.toInt()
                 params.y += velocityY.toInt()
 
-                // 碰壁反弹逻辑
+                // 碰壁反弹，因为反弹系数 0.98，撞击后速度几乎不衰减
                 if (params.x <= 0) {
                     params.x = 0
                     velocityX = -velocityX * bounceFactor
+                    cuteSquash() // 撞墙Q弹
                 } else if (params.x + floatingView.width >= screenWidth) {
                     params.x = screenWidth - floatingView.width
                     velocityX = -velocityX * bounceFactor
+                    cuteSquash()
                 }
 
                 if (params.y + floatingView.height >= screenHeight) {
                     params.y = screenHeight - floatingView.height
-                    if (abs(velocityY) > 10f) {
-                        velocityY = -velocityY * bounceFactor
-                        cuteSquash() 
-                    } else {
-                        // 速度快时才弹，速度慢时停在底部，但保持左右滑动
-                        velocityY = 0f
-                        velocityX *= friction
-                        if (abs(velocityX) < 1f) velocityX = 0f 
-                    }
+                    velocityY = -velocityY * bounceFactor
+                    cuteSquash() 
                 } else if (params.y <= 0) {
                     params.y = 0
                     velocityY = -velocityY * bounceFactor
+                    cuteSquash()
                 }
+
+                // 如果在极慢的情况下（比如漂浮中），为了让基础重力生效，施加微小的动力
+                // (但这步已在重力中完成)
 
                 windowManager.updateViewLayout(floatingView, params)
             }
@@ -356,19 +348,20 @@ class FloatingFishService : Service(), SensorEventListener {
         }
     }
 
-    // 轻微Q弹
+    // 🌟 果冻级 Q 弹（挤压幅度更大，恢复更快）
     private fun cuteSquash() {
         maidFish.animate().cancel()
-        maidFish.scaleX = 1.1f
-        maidFish.scaleY = 0.9f
-        maidFish.animate().scaleX(1f).scaleY(1f).setDuration(150).start()
+        // 根据速度决定形变方向，但简单起见，这里统一做一个夸张的横向压扁
+        maidFish.scaleX = 1.25f
+        maidFish.scaleY = 0.75f
+        maidFish.animate().scaleX(1f).scaleY(1f).setDuration(100).start()
     }
 
     private fun triggerClickInteraction() {
         maidFish.animate().cancel()
-        maidFish.scaleX = 0.85f
-        maidFish.scaleY = 1.15f
-        maidFish.animate().scaleX(1f).scaleY(1f).setDuration(300).start()
+        maidFish.scaleX = 0.8f
+        maidFish.scaleY = 1.2f
+        maidFish.animate().scaleX(1f).scaleY(1f).setDuration(250).start()
 
         val currentTime = System.currentTimeMillis()
         if (currentTime - lastClickTime < 1000) {
@@ -381,7 +374,7 @@ class FloatingFishService : Service(), SensorEventListener {
         if (clickCount >= 5) {
             showDialogue("哎呀！少爷你点疼我了！")
             playRandomAnimation(clickList)
-            velocityY = -20f
+            velocityY = -30f
             clickCount = 0
         } else {
             playRandomAnimation(if (clickList.isNotEmpty()) clickList else idleList)
