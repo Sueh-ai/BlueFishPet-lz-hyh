@@ -125,7 +125,7 @@ class FloatingFishService : Service() {
         floatingView.addView(tvDialogue)
 
         maidFish = ImageView(this).apply {
-            layoutParams = LinearLayout.LayoutParams(350, 350)
+            layoutParams = LinearLayout.LayoutParams(600, 600)
             scaleType = ImageView.ScaleType.FIT_CENTER
         }
         floatingView.addView(maidFish)
