@@ -27,6 +27,8 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import com.bumptech.glide.Glide
 import kotlin.math.abs
+import kotlin.math.hypot
+import kotlin.math.max
 import kotlin.math.sqrt
 import kotlin.random.Random
 
@@ -38,24 +40,40 @@ class FloatingFishService : Service(), SensorEventListener {
     private lateinit var tvDialogue: TextView
     private val handler = Handler(Looper.getMainLooper())
 
-    // 传感器（仅用于摇晃检测，不再用于翻转重力）
+    // 传感器
     private lateinit var sensorManager: SensorManager
     private var lastShakeTime = 0L
     private var lastX = 0f
     private var lastY = 0f
     private var lastZ = 0f
 
-    // 物理参数 (向下重力，干脆的弹跳)
-    private var velocityX = 0f
-    private var velocityY = 0f
+    // 🌟 核心物理变量 (px/s)
+    private var posX = 0.0f
+    private var posY = 0.0f
+    private var velX = 0.0f
+    private var velY = 0.0f
+    
     private var isDragging = false
-    private var isHidden = false // 是否正在贴边隐藏
-    private var lastInteractionTime = 0L // 记录最后互动时间
+    private var isHidden = false 
+    private var lastInteractionTime = 0L 
+    
+    // 拖拽目标点
+    private var targetX = 0.0f
+    private var targetY = 0.0f
 
-    private val gravityBase = 1.5f // 🌟 下落速度稍微快一点
-    private val airFriction = 0.98f 
-    private val restitution = 0.5f // 🌟 弹性降低，弹两下就停
-    private val minBounceSpeedY = 3.0f // 🌟 阈值调高，弹幅小就不弹了
+    // 🌟 提取自大神 Physics.kt 的参数
+    private val GRAVITY = 1400.0f
+    private val RESTITUTION = 0.78f
+    private val GROUND_FRICTION = 2.5f
+    private val SPRING_K = 200.0f
+    private val SPRING_C = 30.0f
+    
+    private val REST_VY = 40.0f
+    private val REST_VX = 15.0f
+    
+    // 轨迹采样（用于估算抛掷速度）
+    private val trail = ArrayList<Pair<Long, Pair<Float, Float>>>()
+    private val MAX_TRAIL_MS = 200L
     
     private var screenWidth = 0
     private var screenHeight = 0
@@ -63,37 +81,22 @@ class FloatingFishService : Service(), SensorEventListener {
 
     private val idleList = mutableListOf<String>()
     private val walkList = mutableListOf<String>()
-    private val sleepList = mutableListOf<String>()
     private val playList = mutableListOf<String>()
     private val clickList = mutableListOf<String>()
 
     private val clickLines = listOf(
         "我亲爱的黎子少爷", "今天还爱我吗", "我好想你呀", 
         "少爷，你终于来看我啦！", "一直盯着你看，都不好意思了...", "最喜欢少爷摸我头了~",
-        "黎子少爷今天也很帅气呢！", "只要能在少爷身边，大肥鱼就很开心了。", "少爷，你要去哪儿呀？带上我好不好？",
-        "偷偷亲少爷一下，嘿嘿~", "今天也想和少爷贴贴！", "少爷，你摸摸我的心跳，好快呀。",
-        "外面风好大，少爷快躲到我身后！", "少爷，我给你捶捶腿吧？", "想变成少爷口袋里的小鱼干，一直跟着你。",
-        "少爷，今天中午吃什么呀？我饿了...", "少爷，你昨晚是不是又熬夜了？黑眼圈都出来了！",
-        "我刚刚差点从屏幕上掉下去了，吓死我了！", "少爷，你的手机屏幕有点脏了，帮我擦擦呗~",
-        "今天天气真好，好想和少爷一起出去玩。", "如果少爷每天都能陪我玩就好了。",
-        "哎呀，少爷你点得太快啦，我都眼花了！", "少爷，你是不是又忘记喂我了？",
-        "我是大肥鱼，会吐泡泡的那种哦！", "别拽我尾巴啦，要秃了！", "哎呀！你弄乱我的头发了！",
-        "再戳我，大肥鱼可要生气了哦！", "哼，怎么现在才来找我？", "笨蛋少爷，我才没有想你！",
-        "走开走开，我要睡觉啦。", "不理你了，除非你拿小鱼干来哄我！"
+        "黎子少爷今天也很帅气呢！", "只要能在少爷身边，大肥鱼就很开心了。",
+        "偷偷亲少爷一下，嘿嘿~", "少爷，你摸摸我的心跳，好快呀。",
+        "少爷，今天中午吃什么呀？我饿了...", "我刚刚差点从屏幕上掉下去了！",
+        "少爷，你的手机屏幕有点脏了，帮我擦擦呗~", "别拽我尾巴啦，要秃了！"
     )
-
-    private val idleLines = listOf("好无聊呀...", "今天天气真好。", "少爷在忙什么呢？", "飘来飘去~")
-    private val sleepLines = listOf("呼...呼...", "Zzz...", "梦里也有少爷呢...")
-
-    private var currentState = "IDLE"
-    private var lastClickTime = 0L
-    private var clickCount = 0
 
     override fun onCreate() {
         super.onCreate()
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
         
-        // 🌟 启动前台服务保活
         setupForegroundService()
 
         sensorManager = getSystemService(SENSOR_SERVICE) as SensorManager
@@ -151,77 +154,73 @@ class FloatingFishService : Service(), SensorEventListener {
             y = screenHeight / 2 - (fishSize / 2) 
         }
 
+        posX = params.x.toFloat()
+        posY = params.y.toFloat()
+
         windowManager.addView(floatingView, params)
         loadAssetsFiles()
         playRandomAnimation(idleList)
         setupTouchListener()
         
+        // 启动物理引擎与状态机
         handler.post(physicsRunnable)
-        handler.postDelayed(stateMachineRunnable, 30000) // 🌟 动作间隔改为 30 秒
-        handler.post(hideRunnable) // 🌟 启动贴边隐藏检测
+        handler.postDelayed(stateMachineRunnable, 20000) 
+        handler.post(hideRunnable) 
     }
 
-    // 🌟 前台服务保活通知
     private fun setupForegroundService() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channelId = "pet_service_channel"
-            val channelName = "桌宠保活服务"
-            val channel = NotificationChannel(channelId, channelName, NotificationManager.IMPORTANCE_LOW)
+            val channel = NotificationChannel(channelId, "桌宠保活服务", NotificationManager.IMPORTANCE_LOW)
             val manager = getSystemService(NotificationManager::class.java)
             manager.createNotificationChannel(channel)
-
             val notification: Notification = Notification.Builder(this, channelId)
                 .setContentTitle("大肥鱼正在陪伴你")
                 .setContentText("她在你的屏幕上玩耍呢~")
                 .setSmallIcon(android.R.drawable.ic_menu_compass)
                 .build()
-            
-            // 启动前台服务
             startForeground(1, notification)
         }
     }
 
-    // 🌟 状态机：每 30 秒换一次动作
+    // 状态机
     private val stateMachineRunnable = object : Runnable {
         override fun run() {
             if (!isDragging && !isHidden) {
                 val r = Random.nextInt(100)
-                currentState = when {
-                    r < 40 -> "IDLE"   
-                    r < 80 -> "WALK"   // 🌟 增加漫步概率，满屏幕跑
-                    else -> "PLAY"     // 🌟 只有跳跃和漫步
+                val state = when {
+                    r < 30 -> "IDLE"   
+                    r < 70 -> "WALK"   
+                    else -> "PLAY"     
                 }
                 
-                when (currentState) {
-                    "IDLE" -> { 
-                        playRandomAnimation(idleList) 
-                        velocityX = 0f
-                    }
+                when (state) {
+                    "IDLE" -> { playRandomAnimation(idleList) }
                     "WALK" -> { 
                         playRandomAnimation(walkList)
-                        // 🌟 随机方向漫游，不会局限在一个地方
-                        velocityX = if (Random.nextBoolean()) Random.nextInt(10, 20).toFloat() else -Random.nextInt(10, 20).toFloat()
+                        // 给一个随机的横向冲刺速度
+                        velX = if (Random.nextBoolean()) Random.nextInt(200, 400).toFloat() else -Random.nextInt(200, 400).toFloat()
                     }
                     "PLAY" -> { 
                         playRandomAnimation(playList)
-                        velocityY = -Random.nextInt(15, 25).toFloat()
-                        velocityX = Random.nextInt(-20, 20).toFloat()
+                        velY = -Random.nextInt(300, 500).toFloat()
+                        velX = Random.nextInt(-300, 300).toFloat()
                     }
                 }
             }
-            handler.postDelayed(this, 30000) 
+            handler.postDelayed(this, 20000) 
         }
     }
 
-    // 🌟 贴边躲藏检测（每秒钟检查一次）
+    // 贴边躲藏
     private val hideRunnable = object : Runnable {
         override fun run() {
             if (!isDragging && !isHidden) {
                 if (System.currentTimeMillis() - lastInteractionTime >= 12000) {
-                    if (params.x <= 20) { // 贴左边
+                    if (posX <= 20) { 
                         maidFish.animate().translationX(-fishSize / 2f).setDuration(300).start()
                         isHidden = true
-                    } else if (params.x + fishSize >= screenWidth - 20) { // 贴右边
+                    } else if (posX + fishSize >= screenWidth - 20) { 
                         maidFish.animate().translationX(fishSize / 2f).setDuration(300).start()
                         isHidden = true
                     }
@@ -231,7 +230,6 @@ class FloatingFishService : Service(), SensorEventListener {
         }
     }
 
-    // 露出隐藏的身子
     private fun reveal() {
         if (isHidden) {
             maidFish.animate().translationX(0f).setDuration(200).start()
@@ -255,11 +253,11 @@ class FloatingFishService : Service(), SensorEventListener {
 
                 if (speed > 12f && !isDragging) { 
                     lastShakeTime = currentTime
-                    reveal() // 摇晃时如果隐藏了，也会弹出来
+                    reveal()
                     handler.post {
                         playRandomAnimation(playList)
-                        velocityY = -Random.nextInt(15, 25).toFloat()
-                        velocityX = Random.nextInt(-15, 15).toFloat()
+                        velY = -Random.nextInt(400, 700).toFloat()
+                        velX = Random.nextInt(-400, 400).toFloat()
                     }
                 }
             }
@@ -276,7 +274,6 @@ class FloatingFishService : Service(), SensorEventListener {
             when {
                 file.startsWith("idle") -> idleList.add(file)
                 file.startsWith("walk") -> walkList.add(file)
-                file.startsWith("sleep") -> sleepList.add(file)
                 file.startsWith("play") -> playList.add(file)
                 file.startsWith("click") -> clickList.add(file)
             }
@@ -292,47 +289,75 @@ class FloatingFishService : Service(), SensorEventListener {
 
     private fun setupTouchListener() {
         floatingView.setOnTouchListener(object : View.OnTouchListener {
-            private var initialX = 0
-            private var initialY = 0
+            private var downTime = 0L
             private var initialTouchX = 0f
             private var initialTouchY = 0f
-            private var lastTouchX = 0f
-            private var lastTouchY = 0f
-            private var downTime = 0L
 
             override fun onTouch(v: View?, event: MotionEvent?): Boolean {
                 when (event?.action) {
                     MotionEvent.ACTION_DOWN -> {
-                        reveal() // 碰一下就探出来
+                        reveal()
                         isDragging = true
-                        initialX = params.x; initialY = params.y
-                        initialTouchX = event.rawX; initialTouchY = event.rawY
-                        lastTouchX = event.rawX; lastTouchY = event.rawY
                         downTime = System.currentTimeMillis()
+                        initialTouchX = event.rawX
+                        initialTouchY = event.rawY
+                        
+                        targetX = posX
+                        targetY = posY
+                        
+                        trail.clear()
+                        trail.add(Pair(downTime, Pair(event.rawX, event.rawY)))
                         hideDialogue()
                         return true
                     }
                     MotionEvent.ACTION_MOVE -> {
-                        val dx = (event.rawX - initialTouchX).toInt()
-                        val dy = (event.rawY - initialTouchY).toInt()
+                        val now = System.currentTimeMillis()
+                        trail.add(Pair(now, Pair(event.rawX, event.rawY)))
+                        // 保持轨迹队列不超时
+                        trail.removeAll { now - it.first > MAX_TRAIL_MS }
+
+                        // 将手指移动映射到目标位置
+                        targetX += (event.rawX - initialTouchX) * 0.3f
+                        targetY += (event.rawY - initialTouchY) * 0.3f
                         
-                        params.x = (initialX + dx).coerceIn(0, screenWidth - floatingView.width)
-                        params.y = (initialY + dy).coerceIn(0, screenHeight - floatingView.height)
-                        
-                        windowManager.updateViewLayout(floatingView, params)
-                        
-                        velocityX = (event.rawX - lastTouchX) * 0.8f
-                        velocityY = (event.rawY - lastTouchY) * 0.8f
-                        lastTouchX = event.rawX; lastTouchY = event.rawY
+                        // 边界限制（防止拖出屏幕）
+                        targetX = targetX.coerceIn(0f, (screenWidth - floatingView.width).toFloat())
+                        targetY = targetY.coerceIn(0f, (screenHeight - floatingView.height).toFloat())
+
+                        initialTouchX = event.rawX
+                        initialTouchY = event.rawY
                         return true
                     }
                     MotionEvent.ACTION_UP -> {
                         isDragging = false
+                        
                         if (System.currentTimeMillis() - downTime < 200 && abs(event.rawX - initialTouchX) < 10) {
+                            // 点击
                             triggerClickInteraction()
+                            velX = 0f
+                            velY = 0f
                         } else {
-                            velocityX = (event.rawX - lastTouchX) * 1.5f
-                            velocityY = (event.rawY - lastTouchY) * 1.5f
+                            // 抛掷：推算速度
+                            val now = System.currentTimeMillis()
+                            val validTrail = trail.filter { now - it.first <= 150L }
+                            if (validTrail.size >= 2) {
+                                val t0 = validTrail.first().first
+                                val t1 = validTrail.last().first
+                                val x0 = validTrail.first().second.first
+                                val x1 = validTrail.last().second.first
+                                val y0 = validTrail.first().second.second
+                                val y1 = validTrail.last().second.second
+                                
+                                val dt = (t1 - t0).toFloat()
+                                if (dt > 20f) {
+                                    velX = ((x1 - x0) / dt * 1000f).coerceIn(-3000f, 3000f)
+                                    velY = ((y1 - y0) / dt * 1000f).coerceIn(-3000f, 3000f)
+                                } else {
+                                    velX = 0f; velY = 0f
+                                }
+                            } else {
+                                velX = 0f; velY = 0f
+                            }
                         }
                         return true
                     }
@@ -342,60 +367,69 @@ class FloatingFishService : Service(), SensorEventListener {
         })
     }
 
+    // 🌟 基于真实时间 (dt) 的物理引擎
     private val physicsRunnable = object : Runnable {
         override fun run() {
-            if (!isDragging && !isHidden) {
-                // 🌟 始终向下的重力
-                velocityY += gravityBase
+            val dt = 0.016f // 约 60 FPS 的时间步长 (秒)
+            
+            if (isDragging) {
+                // 过阻尼弹簧跟手 (Spring K=200, C=30)
+                val forceX = (targetX - posX) * SPRING_K - velX * SPRING_C
+                val forceY = (targetY - posY) * SPRING_K - velY * SPRING_C
                 
-                velocityX *= airFriction
-                velocityY *= airFriction
-
-                if (abs(velocityX) < 0.05f) velocityX = 0f
-
-                params.x += velocityX.toInt()
-                params.y += velocityY.toInt()
-
-                var hitEdge = false
-
-                // 左右碰壁反弹
-                if (params.x <= 0) {
-                    params.x = 0
-                    velocityX = abs(velocityX) * 0.8f + 5f 
-                    hitEdge = true
-                } else if (params.x + floatingView.width >= screenWidth) {
-                    params.x = screenWidth - floatingView.width
-                    velocityX = -(abs(velocityX) * 0.8f + 5f)
-                    hitEdge = true
-                }
-
-                // 🌟 落地干脆的反弹
-                if (params.y <= 0) {
-                    params.y = 0
-                    if (abs(velocityY) > minBounceSpeedY) {
-                        velocityY = abs(velocityY) * restitution
-                        hitEdge = true
-                    } else {
-                        velocityY = 0f
-                    }
-                } else if (params.y + floatingView.height >= screenHeight) {
+                velX += forceX * dt
+                velY += forceY * dt
                 
-                    params.y = screenHeight - floatingView.height
-                    if (abs(velocityY) > minBounceSpeedY) {
-                        velocityY = -abs(velocityY) * restitution
-                        hitEdge = true
-                    } else {
-                        velocityY = 0f // 停下
-                        velocityX = 0f 
-                    }
-                }
+                posX += velX * dt
+                posY += velY * dt
+            } else if (!isHidden) {
+                // 纯正向下重力
+                velY += GRAVITY * dt
+                
+                posX += velX * dt
+                posY += velY * dt
 
-                if (hitEdge) {
+                // 碰到左右边缘：反弹
+                if (posX <= 0) {
+                    posX = 0f
+                    velX = -velX * RESTITUTION
+                    jellySquash()
+                } else if (posX + floatingView.width >= screenWidth) {
+                    posX = (screenWidth - floatingView.width).toFloat()
+                    velX = -velX * RESTITUTION
                     jellySquash()
                 }
 
+                // 碰到上下边缘
+                if (posY <= 0) {
+                    posY = 0f
+                    velY = -velY * RESTITUTION
+                    jellySquash()
+                } else if (posY + floatingView.height >= screenHeight) {
+                    posY = (screenHeight - floatingView.height).toFloat()
+                    
+                    // 如果下落速度足够快，就弹起
+                    if (abs(velY) > REST_VY) {
+                        velY = -velY * RESTITUTION
+                        jellySquash()
+                    } else {
+                        // 停在地面
+                        velY = 0f
+                    }
+                    
+                    // 地面摩擦力作用在水平速度上
+                    velX -= velX * GROUND_FRICTION * dt
+                    if (abs(velX) < REST_VX) velX = 0f
+                }
+            }
+
+            // 同步到系统悬浮窗坐标
+            if (!isHidden) {
+                params.x = posX.toInt()
+                params.y = posY.toInt()
                 windowManager.updateViewLayout(floatingView, params)
             }
+            
             handler.postDelayed(this, 16)
         }
     }
@@ -414,25 +448,8 @@ class FloatingFishService : Service(), SensorEventListener {
 
     private fun triggerClickInteraction() {
         jellySquash()
-
-        val currentTime = System.currentTimeMillis()
-        if (currentTime - lastClickTime < 1000) {
-            clickCount++
-        } else {
-            clickCount = 1
-        }
-        lastClickTime = currentTime
-
-        if (clickCount >= 5) {
-            showDialogue("哎呀！少爷你点疼我了！")
-            playRandomAnimation(clickList)
-            velocityY = -15f
-            velocityX = Random.nextInt(-15, 15).toFloat()
-            clickCount = 0
-        } else {
-            playRandomAnimation(if (clickList.isNotEmpty()) clickList else idleList)
-            showDialogue(clickLines[Random.nextInt(clickLines.size)])
-        }
+        playRandomAnimation(if (clickList.isNotEmpty()) clickList else idleList)
+        showDialogue(clickLines[Random.nextInt(clickLines.size)])
     }
 
     private fun showDialogue(text: String) {
