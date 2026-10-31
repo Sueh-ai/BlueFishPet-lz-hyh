@@ -82,7 +82,7 @@ class MainActivity : AppCompatActivity() {
             setTextColor(Color.parseColor("#1A1B21"))
             val btnBg = GradientDrawable().apply {
                 setColor(Color.parseColor("#FFD700"))
-                cornerRadius = 50f 
+                cornerRadius = 50f
             }
             background = btnBg
             val lp = LinearLayout.LayoutParams(
@@ -95,7 +95,7 @@ class MainActivity : AppCompatActivity() {
         cardLayout.addView(btnStart)
 
         rootLayout.addView(cardLayout)
-        
+
         val spacer = android.view.View(this)
         rootLayout.addView(spacer, LinearLayout.LayoutParams(1, 0, 1f))
 
@@ -108,7 +108,7 @@ class MainActivity : AppCompatActivity() {
             setPadding(0, 0, 0, 100)
         }
         rootLayout.addView(tvLove)
-        
+
         seekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
                 if (progress > 200) tvSizeShow.text = "体型大小：$progress"
@@ -131,14 +131,10 @@ class MainActivity : AppCompatActivity() {
                         Uri.parse("package:$packageName")
                     )
                     startActivity(intent)
-                } else {
-                    startService(Intent(this, FloatingFishService::class.java))
-                    finish()
-                }
-            } else {
+               } else {
                 startService(Intent(this, FloatingFishService::class.java))
                 finish()
             }
         }
     }
-}
+    }
