@@ -38,7 +38,7 @@ class FloatingFishService : Service(), SensorEventListener {
     // 🌟 传感器与旋转防抖
     private lateinit var sensorManager: SensorManager
     private var currentRotation = 0f
-    private var lastAnimatedRotation = -1f // 记录上一次动画的角度
+    private var lastAnimatedRotation = -1f 
     private var lastShakeTime = 0L
     private var lastX = 0f
     private var lastY = 0f
@@ -55,7 +55,7 @@ class FloatingFishService : Service(), SensorEventListener {
     private val gravityBase = 0.15f 
     private val airFriction = 0.98f 
     private val restitution = 0.6f  
-    private val minBounceSpeedY = 1.5f // 上下弹跳的最低速度阈值
+    private val minBounceSpeedY = 1.5f 
     
     private var screenWidth = 0
     private var screenHeight = 0
@@ -130,8 +130,8 @@ class FloatingFishService : Service(), SensorEventListener {
         ).apply {
             gravity = Gravity.TOP or Gravity.START
             x = screenWidth / 2 - (fishSize / 2)
-            y = screenHeight / 2 - (fishSize / 2) 
-        }
+            y = screenHeight / 2 - (fishSize / 2)
+         }
 
         windowManager.addView(floatingView, params)
         loadAssetsFiles()
@@ -141,13 +141,12 @@ class FloatingFishService : Service(), SensorEventListener {
         handler.post(physicsRunnable)
     }
 
-     override fun onSensorChanged(event: SensorEvent?) {
+    override fun onSensorChanged(event: SensorEvent?) {
         if (event?.sensor?.type == Sensor.TYPE_ACCELEROMETER) {
             val x = event.values[0]
             val y = event.values[1]
             val z = event.values[2]
 
-            // 判断大方向翻转
             if (Math.abs(x) > Math.abs(y)) {
                 if (x > 5) {
                     gravityDirX = -1f; gravityDirY = 0f; currentRotation = 90f
@@ -162,13 +161,11 @@ class FloatingFishService : Service(), SensorEventListener {
                 }
             }
             
-            // 🌟 修复卡顿：只有当前角度和“已经执行过的角度”不一样时，才触发动画
             if (currentRotation != lastAnimatedRotation) {
                 maidFish.animate().rotation(currentRotation).setDuration(400).start()
-                lastAnimatedRotation = currentRotation // 记录，防止同个方向频繁触发
+                lastAnimatedRotation = currentRotation 
             }
 
-            // 摇晃检测
             val currentTime = System.currentTimeMillis()
             if ((currentTime - lastShakeTime) > 400) {
                 val deltaX = abs(x - lastX)
@@ -276,10 +273,9 @@ class FloatingFishService : Service(), SensorEventListener {
 
                 var hitEdge = false
 
-                // 🌟 左右碰撞：强制弹射，绝不贴墙
+                // 左右碰撞（保底弹力）
                 if (params.x <= 0) {
                     params.x = 0
-                    // 如果本来是在往左走（或者被重力拉着），强制给它一个向右的初速度
                     velocityX = abs(velocityX) * restitution + 4f 
                     hitEdge = true
                 } else if (params.x + fishSize >= screenWidth) {
@@ -288,7 +284,7 @@ class FloatingFishService : Service(), SensorEventListener {
                     hitEdge = true
                 }
 
-                // 上下碰撞：保留低速停靠（防底边抽搐）
+                // 上下碰撞（阻尼衰减）
                 if (params.y <= 0) {
                     params.y = 0
                     if (abs(velocityY) > minBounceSpeedY) {
@@ -317,18 +313,17 @@ class FloatingFishService : Service(), SensorEventListener {
         }
     }
 
+    // 🌟 极致Q弹：大幅度形变 + 果冻颤抖
     private fun jellySquash() {
-    maidFish.animate().cancel()
-    // 形变幅度加大：横向拉伸到 1.25，纵向压扁到 0.75
-    maidFish.scaleX = 1.25f
-    maidFish.scaleY = 0.75f
-    // 回弹时间延长到 350ms，并且使用 OvershootInterpolator(3.5f) 产生果冻颤动
-    maidFish.animate()
-        .scaleX(1f)
-        .scaleY(1f)
-        .setInterpolator(android.view.animation.OvershootInterpolator(3.5f)) 
-        .setDuration(350)
-        .start()
+        maidFish.animate().cancel()
+        maidFish.scaleX = 1.25f
+        maidFish.scaleY = 0.75f
+        maidFish.animate()
+            .scaleX(1f)
+            .scaleY(1f)
+            .setInterpolator(OvershootInterpolator(3.5f)) 
+            .setDuration(350) 
+            .start()
     }
 
     private fun triggerClickInteraction() {
