@@ -5,6 +5,7 @@ import android.content.Intent
 import android.content.res.AssetManager
 import android.graphics.Color
 import android.graphics.PixelFormat
+import android.graphics.drawable.GradientDrawable
 import android.os.Build
 import android.os.Handler
 import android.os.IBinder
@@ -31,7 +32,7 @@ class FloatingFishService : Service() {
     private var velocityY = 0f
     private var isDragging = false
     private var gravity = 20f
-    private var bounceFactor = -0.65f
+    private var bounceFactor = -0.8f // 🌟 增强了反弹力度
     private var friction = 0.95f
     private var screenWidth = 0
     private var screenHeight = 0
@@ -42,64 +43,27 @@ class FloatingFishService : Service() {
     private val playList = mutableListOf<String>()
     private val clickList = mutableListOf<String>()
 
-    // 🌟 互动台词库（你想加多少就往下加，注意标点）
+    // 🌟 台词库
     private val clickLines = listOf(
-        // 专属核心台词
-        "我亲爱的黎子少爷",
-        "今天还爱我",
-        "我好想你",
-        // 撒娇/深情
-        "少爷，你终于来看我啦！",
-        "一直盯着你看，都不好意思了...",
-        "最喜欢少爷摸我头了~",
-        "黎子少爷今天也很帅气呢！",
-        "只要能在少爷身边，大肥鱼就很开心了。",
-        "少爷，你要去哪儿呀？带上我好不好？",
-        "偷偷亲少爷一下，嘿嘿~",
-        "今天也想和少爷贴贴！",
-        "少爷，你摸摸我的心跳，好快呀。",
-        "外面风好大，少爷快躲到我身后！",
-        // 傲娇/小脾气
-        "哼，怎么现在才来找我？",
-        "别拽我尾巴啦，要秃了！",
-        "哎呀！你弄乱我的头发了！",
-        "少爷，你点得我头好晕呀...",
-        "再戳我，大肥鱼可要生气了哦！",
-        "笨蛋少爷，我才没有想你！",
-        "走开走开，我要睡觉啦。",
-        "少爷，你是不是又忘记喂我了？",
-        "不理你了，除非你拿小鱼干来哄我！",
-        "大肥鱼也是有脾气的！",
-        // 日常/搞笑
-        "我是大肥鱼，会吐泡泡的那种哦！",
-        "今天的网速好像有点慢呢。",
-        "少爷，今天中午吃什么呀？",
-        "救命，我卡在屏幕边缘了！",
-        "如果少爷每天都能陪我玩就好了。",
-        "我是不是全宇宙最可爱的女仆？",
-        "黎子少爷，工作辛苦啦，休息一下吧。",
-        "滴——电量不足，需要少爷的亲亲充电。",
-        "我要在屏幕上跑圈圈啦！",
-        "今天也是努力学习做女仆的一天！",
-        "少爷，你看我新学的舞步好看吗？",
-        "盯——(●'◡'●)",
-        "不知道少爷的脑袋里在想什么呢？",
-        "如果我不听话，少爷会赶我走吗？",
-        "虽然我胖胖的，但是我跑得快呀！",
-        "少爷，别熬夜啦，快去睡觉！",
-        "我最大的梦想，就是一直陪在少爷身边。",
-        "今天也是被黎子少爷迷倒的一天。",
-        "偷偷告诉你，其实我是一条美人鱼~",
-        "少爷少爷，快看！那里有只小猫！",
-        "我刚刚是不是很没形象地摔倒了？",
-        "少爷，你要是再不理我，我就哭给你看！",
-        "大肥鱼想睡觉了，要抱抱才肯睡...",
-        "其实我有点怕黑，少爷别关灯。",
-        "少爷，我今天表现得好不好呀？"
+        "我亲爱的黎子少爷", "今天还爱我", "我好想你", 
+        "少爷，你终于来看我啦！", "一直盯着你看，都不好意思了...", "最喜欢少爷摸我头了~",
+        "黎子少爷今天也很帅气呢！", "只要能在少爷身边，大肥鱼就很开心了。", "少爷，你要去哪儿呀？带上我好不好？",
+        "偷偷亲少爷一下，嘿嘿~", "今天也想和少爷贴贴！", "少爷，你摸摸我的心跳，好快呀。",
+        "外面风好大，少爷快躲到我身后！", "哼，怎么现在才来找我？", "别拽我尾巴啦，要秃了！",
+        "哎呀！你弄乱我的头发了！", "少爷，你点得我头好晕呀...", "再戳我，大肥鱼可要生气了哦！",
+        "笨蛋少爷，我才没有想你！", "走开走开，我要睡觉啦。", "少爷，你是不是又忘记喂我了？",
+        "不理你了，除非你拿小鱼干来哄我！", "大肥鱼也是有脾气的！", "我是大肥鱼，会吐泡泡的那种哦！",
+        "今天的网速好像有点慢呢。", "少爷，今天中午吃什么呀？", "救命，我卡在屏幕边缘了！",
+        "如果少爷每天都能陪我玩就好了。", "我是不是全宇宙最可爱的女仆？", "黎子少爷，工作辛苦啦，休息一下吧。",
+        "滴——电量不足，需要少爷的亲亲充电。", "我要在屏幕上跑圈圈啦！", "今天也是努力学习做女仆的一天！",
+        "少爷，你看我新学的舞步好看吗？", "盯——(●'◡'●)", "不知道少爷的脑袋里在想什么呢？",
+        "如果我不听话，少爷会赶我走吗？", "虽然我胖胖的，但是我跑得快呀！", "少爷，别熬夜啦，快去睡觉！",
+        "我最大的梦想，就是一直陪在少爷身边。", "今天也是被黎子少爷迷倒的一天。", "偷偷告诉你，其实我是一条美人鱼~",
+        "少爷少爷，快看！那里有只小猫！", "我刚刚是不是很没形象地摔倒了？", "少爷，你要是再不理我，我就哭给你看！",
+        "大肥鱼想睡觉了，要抱抱才肯睡...", "其实我有点怕黑，少爷别关灯。", "少爷，我今天表现得好不好呀？"
     )
-
-    private val idleLines = listOf("好无聊呀...", "今天天气真好。", "少爷怎么不理我...")
-    private val sleepLines = listOf("呼...呼...", "Zzz...", "梦里也有少爷呢...")
+    private val idleLines = listOf("好无聊呀...", "今天天气真好。")
+    private val sleepLines = listOf("呼...呼...", "Zzz...")
 
     private var currentState = "IDLE"
     private var lastClickTime = 0L
@@ -113,20 +77,39 @@ class FloatingFishService : Service() {
         floatingView = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
+            clipChildren = false // 防止气泡被裁剪
         }
 
+        // 🌟 漂亮的圆角对话框
+        val bubbleBg = GradientDrawable().apply {
+            setColor(Color.parseColor("#E6192124")) // 高级深灰半透明
+            cornerRadius = 30f // 圆角
+            setStroke(2, Color.parseColor("#3A3A3A")) // 边框
+        }
+        
         tvDialogue = TextView(this).apply {
-            setBackgroundColor(Color.parseColor("#CC000000"))
+            background = bubbleBg
             setTextColor(Color.WHITE)
             textSize = 14f
-            setPadding(20, 10, 20, 10)
-            visibility = View.GONE
+            setPadding(30, 20, 30, 20)
+            visibility = View.INVISIBLE
+            alpha = 0f // 初始透明，用于淡入淡出
+            gravity = Gravity.CENTER
+            val lp = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+            lp.bottomMargin = 30
+            layoutParams = lp
         }
         floatingView.addView(tvDialogue)
 
+        // 🌟 大肥鱼大小设置 (想要多大改这里的 600)
+        val fishSize = 600
         maidFish = ImageView(this).apply {
-            layoutParams = LinearLayout.LayoutParams(600, 600)
+            layoutParams = LinearLayout.LayoutParams(fishSize, fishSize)
             scaleType = ImageView.ScaleType.FIT_CENTER
+            setPadding(20, 20, 20, 20) // 留点边距，防止Q弹时被切
         }
         floatingView.addView(maidFish)
 
@@ -142,11 +125,11 @@ class FloatingFishService : Service() {
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.START
-            x = screenWidth / 2 - 150
+            x = screenWidth / 2 - (fishSize / 2)
             y = 200
         }
 
-        windowManager.addView(floatingView, params)
+windowManager.addView(floatingView, params)
         loadAssetsFiles()
         playRandomAnimation(idleList)
         setupTouchListener()
@@ -213,7 +196,10 @@ class FloatingFishService : Service() {
                         initialTouchX = event.rawX; initialTouchY = event.rawY
                         lastTouchX = event.rawX; lastTouchY = event.rawY
                         downTime = System.currentTimeMillis()
-                        tvDialogue.visibility = View.GONE
+                        hideDialogue() // 拖拽时隐藏对话
+                        
+                        // 拖拽时稍微放大一点点
+                        maidFish.animate().scaleX(1.05f).scaleY(0.95f).setDuration(100).start()
                         return true
                     }
                     MotionEvent.ACTION_MOVE -> {
@@ -227,6 +213,9 @@ class FloatingFishService : Service() {
                     }
                     MotionEvent.ACTION_UP -> {
                         isDragging = false
+                        // 恢复大小
+                        maidFish.animate().scaleX(1f).scaleY(1f).setDuration(100).start()
+                        
                         if (System.currentTimeMillis() - downTime < 200 && Math.abs(event.rawX - initialTouchX) < 10) {
                             triggerClickInteraction()
                         } else {
@@ -248,14 +237,19 @@ class FloatingFishService : Service() {
                 params.x += velocityX.toInt()
                 params.y += velocityY.toInt()
 
+                // 左右边缘反弹
                 if (params.x <= 0) {
                     params.x = 0
                     velocityX = -velocityX * bounceFactor
                 } else if (params.x + floatingView.width >= screenWidth) {
                     params.x = screenWidth - floatingView.width
                     velocityX = -velocityX * bounceFactor
+                } else if (params.x + floatingView.width >= screenWidth) {
+                    params.x = screenWidth - floatingView.width
+                    velocityX = -velocityX * bounceFactor
                 }
 
+                // 底部和顶部反弹
                 if (params.y + floatingView.height >= screenHeight) {
                     params.y = screenHeight - floatingView.height
                     velocityY = -velocityY * bounceFactor
@@ -272,6 +266,12 @@ class FloatingFishService : Service() {
     }
 
     private fun triggerClickInteraction() {
+        // 🌟 核心Q弹效果 (果冻缩放)
+        maidFish.animate().cancel()
+        maidFish.scaleX = 0.8f
+        maidFish.scaleY = 1.2f
+        maidFish.animate().scaleX(1f).scaleY(1f).setDuration(300).start()
+
         val currentTime = System.currentTimeMillis()
         if (currentTime - lastClickTime < 1000) {
             clickCount++
@@ -283,7 +283,7 @@ class FloatingFishService : Service() {
         if (clickCount >= 5) {
             showDialogue("哎呀！少爷你点疼我了！")
             playRandomAnimation(clickList)
-            velocityY = -40f
+            velocityY = -40f // 戳急了会跳起来
             clickCount = 0
         } else {
             playRandomAnimation(if (clickList.isNotEmpty()) clickList else idleList)
@@ -292,14 +292,26 @@ class FloatingFishService : Service() {
         }
     }
 
+    // 🌟 平滑显示对话框（防闪烁）
     private fun showDialogue(text: String) {
         tvDialogue.text = text
+        tvDialogue.animate().cancel() // 取消上一个动画
         tvDialogue.visibility = View.VISIBLE
+        tvDialogue.animate().alpha(1f).setDuration(200).start()
+        
         handler.removeCallbacks(hideDialogueRunnable)
-        handler.postDelayed(hideDialogueRunnable, 3500)
+        handler.postDelayed(hideDialogueRunnable, 3000) // 3秒后消失
     }
 
-    private val hideDialogueRunnable = Runnable { tvDialogue.visibility = View.GONE }
+    // 🌟 平滑隐藏对话框
+    private fun hideDialogue() {
+        tvDialogue.animate().cancel()
+        tvDialogue.animate().alpha(0f).setDuration(200).withEndAction {
+            tvDialogue.visibility = View.INVISIBLE
+        }.start()
+    }
+
+    private val hideDialogueRunnable = Runnable { hideDialogue() }
 
     override fun onBind(intent: Intent?): IBinder? = null
     
