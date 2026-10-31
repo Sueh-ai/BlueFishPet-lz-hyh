@@ -17,75 +17,97 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        // 1. 核心深色背景
         val bgDrawable = GradientDrawable(
             GradientDrawable.Orientation.TL_BR,
-            intArrayOf(Color.parseColor("#1A1B21"), Color.parseColor("#2D2F3B"))
+            intArrayOf(Color.parseColor("#121318"), Color.parseColor("#1E2029"))
         )
-
-        val layout = LinearLayout(this).apply {
+        val rootLayout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             background = bgDrawable
-            setPadding(60, 200, 60, 60)
+            setPadding(50, 150, 50, 50)
             gravity = android.view.Gravity.CENTER_HORIZONTAL
         }
 
-        val tvTitle = TextView(this).apply {
-            text = "黎子少爷的专属大肥鱼"
-            textSize = 24f
-            setTextColor(Color.WHITE)
+        // 2. 卡片式容器
+        val cardLayout = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = android.view.Gravity.CENTER_HORIZONTAL
+            setPadding(60, 80, 60, 80)
+            val cardBg = GradientDrawable().apply {
+                setColor(Color.parseColor("#2A2D3A")) // 稍亮的卡片色
+                cornerRadius = 60f
+                setStroke(2, Color.parseColor("#FFD700")) // 金色描边
+            }
+            background = cardBg
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
         }
-        layout.addView(tvTitle)
+
+        val tvTitle = TextView(this).apply {
+            text = "专属大肥鱼"
+            textSize = 26f
+            setTextColor(Color.WHITE)
+            setTypeface(null, android.graphics.Typeface.BOLD)
+        }
+        cardLayout.addView(tvTitle)
 
         val tvSubtitle = TextView(this).apply {
-            text = "\n摇晃手机，她会四处乱弹哦！\n设置大小后召唤：\n"
+            text = "轻飘飘的果冻精灵"
             textSize = 14f
-            setTextColor(Color.parseColor("#AAAAAA"))
+            setTextColor(Color.parseColor("#FFD700"))
+            setPadding(0, 10, 0, 40)
         }
-        layout.addView(tvSubtitle)
+        cardLayout.addView(tvSubtitle)
 
         val tvSizeShow = TextView(this).apply {
-            text = "当前大小: 600"
-            textSize = 18f
-            setTextColor(Color.parseColor("#FFD700"))
-            setPadding(0, 30, 0, 30)
+            text = "体型大小：600"
+            textSize = 16f
+            setTextColor(Color.parseColor("#CCCCCC"))
+            setPadding(0, 20, 0, 20)
         }
-        layout.addView(tvSizeShow)
+        cardLayout.addView(tvSizeShow)
 
         val seekBar = SeekBar(this).apply {
-            max = 1000
+            max = 800
             progress = 600
             progressTintList = android.content.res.ColorStateList.valueOf(Color.parseColor("#FFD700"))
             thumbTintList = android.content.res.ColorStateList.valueOf(Color.parseColor("#FFD700"))
         }
-        layout.addView(seekBar)
+        cardLayout.addView(seekBar)
 
+        // 美化按钮
         val btnStart = Button(this).apply {
-            text = "🚀 召唤大肥鱼"
+            text = "召 唤 大 肥 鱼"
             textSize = 18f
-            setTextColor(Color.BLACK)
+            setTextColor(Color.parseColor("#1A1B21"))
             val btnBg = GradientDrawable().apply {
                 setColor(Color.parseColor("#FFD700"))
-                cornerRadius = 50f
+                cornerRadius = 50f 
             }
             background = btnBg
             val lp = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
+                140
             )
-            lp.topMargin = 80
+            lp.topMargin = 60
             layoutParams = lp
         }
-        layout.addView(btnStart)
+        cardLayout.addView(btnStart)
 
+        rootLayout.addView(cardLayout)
+        
         seekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
-                if (progress > 200) tvSizeShow.text = "当前大小: $progress"
+                if (progress > 200) tvSizeShow.text = "体型大小：$progress"
             }
             override fun onStartTrackingTouch(seekBar: SeekBar?) {}
             override fun onStopTrackingTouch(seekBar: SeekBar?) {}
         })
 
-        setContentView(layout)
+        setContentView(rootLayout)
 
         btnStart.setOnClickListener {
             val finalSize = if (seekBar.progress > 200) seekBar.progress else 600
