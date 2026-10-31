@@ -131,7 +131,11 @@ class MainActivity : AppCompatActivity() {
                         Uri.parse("package:$packageName")
                     )
                     startActivity(intent)
-               } else {
+                } else {
+                    startService(Intent(this, FloatingFishService::class.java))
+                    finish()
+                }
+            } else {
                 startService(Intent(this, FloatingFishService::class.java))
                 finish()
             }
