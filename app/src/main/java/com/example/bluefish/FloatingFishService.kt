@@ -132,4 +132,123 @@ class FloatingFishService : Service() {
                     }
                 }
             }
-            handler.post
+handler.postDelayed(this, 10000) 
+        }
+    }
+
+    private fun setupTouchListener() {
+        floatingView.setOnTouchListener(object : View.OnTouchListener {
+            private var initialX = 0
+            private var initialY = 0
+            private var initialTouchX = 0f
+            private var initialTouchY = 0f
+            private var lastTouchX = 0f
+            private var lastTouchY = 0f
+            private var downTime = 0L
+
+            override fun onTouch(v: View?, event: MotionEvent?): Boolean {
+                when (event?.action) {
+                    MotionEvent.ACTION_DOWN -> {
+                        isDragging = true
+                        initialX = params.x; initialY = params.y
+                        initialTouchX = event.rawX; initialTouchY = event.rawY
+                        lastTouchX = event.rawX; lastTouchY = event.rawY
+                        downTime = System.currentTimeMillis()
+                        tvDialogue.visibility = View.GONE
+                        return true
+                    }
+                    MotionEvent.ACTION_MOVE -> {
+                        params.x = initialX + (event.rawX - initialTouchX).toInt()
+                        params.y = initialY + (event.rawY - initialTouchY).toInt()
+                        windowManager.updateViewLayout(floatingView, params)
+                        
+                        velocityX = (event.rawX - lastTouchX) * 1.5f
+                        velocityY = (event.rawY - lastTouchY) * 1.5f
+                        lastTouchX = event.rawX; lastTouchY = event.rawY
+                        return true
+                    }
+                    MotionEvent.ACTION_UP -> {
+                        isDragging = false
+                        if (System.currentTimeMillis() - downTime < 200 && Math.abs(event.rawX - initialTouchX) < 10) {
+                            triggerClickInteraction()
+                        } else {
+                            velocityX = event.rawX - lastTouchX
+                            velocityY = event.rawY - lastTouchY
+                        }
+                        return true
+                    }
+                }
+                return false
+            }
+        })
+    }
+
+    private val physicsRunnable = object : Runnable {
+        override fun run() {
+            if (!isDragging) {
+                velocityY += gravity / 10f
+                params.x += velocityX.toInt()
+                params.y += velocityY.toInt()
+
+                if (params.x <= 0) {
+                    params.x = 0
+                    velocityX = -velocityX * bounceFactor
+                } else if (params.x + floatingView.width >= screenWidth) {
+                    params.x = screenWidth - floatingView.width
+                    velocityX = -velocityX * bounceFactor
+                }
+
+                if (params.y + floatingView.height >= screenHeight) {
+                    params.y = screenHeight - floatingView.height
+                    velocityY = -velocityY * bounceFactor
+                    if (Math.abs(velocityY) < 20) velocityY = 0f 
+                    velocityX *= friction 
+                } else if (params.y <= 0) {
+                    params.y = 0
+                    velocityY = -velocityY * bounceFactor
+                }
+
+                windowManager.updateViewLayout(floatingView, params)
+            }
+            handler.postDelayed(this, 16)
+        }
+    }
+
+    private fun triggerClickInteraction() {
+        val currentTime = System.currentTimeMillis()
+        if (currentTime - lastClickTime < 1000) {
+            clickCount++
+        } else {
+            clickCount = 1
+        }
+        lastClickTime = currentTime
+
+        if (clickCount >= 5) {
+            showDialogue("哎呀！少爷你点疼我了！")
+            playRandomAnimation(clickList)
+            velocityY = -40f
+            clickCount = 0
+        } else {
+            playRandomAnimation(if (clickList.isNotEmpty()) clickList else idleList)
+            val line = clickLines[Random.nextInt(clickLines.size)]
+            showDialogue(line)
+        }
+    }
+
+    private fun showDialogue(text: String) {
+        tvDialogue.text = text
+        tvDialogue.visibility = View.VISIBLE
+        handler.removeCallbacks(hideDialogueRunnable)
+        handler.postDelayed(hideDialogueRunnable, 3500)
+    }
+
+    private val hideDialogueRunnable = Runnable { tvDialogue.visibility = View.GONE }
+
+    override fun onBind(intent: Intent?): IBinder? = null
+    
+    override fun onDestroy() {
+        super.onDestroy()
+        handler.removeCallbacksAndMessages(null)
+        if (floatingView.isAttachedToWindow) windowManager.removeView(floatingView)
+    }
+}
